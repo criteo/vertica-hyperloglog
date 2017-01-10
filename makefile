@@ -1,6 +1,6 @@
 SDK_HOME?=/opt/vertica/sdk
 CXX?=g++
-CXXFLAGS:=$(CXXFLAGS) -I $(SDK_HOME)/include -I HelperLibraries -g -Wall -Wno-unused-value -shared -fPIC -O3
+CXXFLAGS:=$(CXXFLAGS) -I $(SDK_HOME)/include -I HelperLibraries -g -Wall -Wno-unused-value -shared -fPIC -std=c++11 -O3
 ## BUILD_DIR?=$(abspath build)
 BUILD_DIR?=/tmp/build
 BUILD_TMPDIR?=$(BUILD_DIR)/tmp
