@@ -4,12 +4,22 @@ select version();
 \echo Loading the Approximate library: :u_libfile
 CREATE OR REPLACE LIBRARY HllLib AS :u_libfile;
 
-CREATE OR REPLACE AGGREGATE FUNCTION HllDistinctCount
+CREATE OR REPLACE AGGREGATE FUNCTION HllCreateSynopsis
 AS LANGUAGE 'C++' 
-NAME 'HllDistinctCountFactory' 
+NAME 'HllCreateSynopsisFactory' 
 LIBRARY HllLib;
 
 GRANT EXECUTE
-ON AGGREGATE FUNCTION HllDistinctCount(BIGINT)
+ON AGGREGATE FUNCTION HllCreateSynopsis
 TO PUBLIC;
+
+CREATE OR REPLACE AGGREGATE FUNCTION HllDistinctCount
+AS LANGUAGE 'C++'
+NAME 'HllDistinctCountFactory'
+LIBRARY HllLib;
+
+GRANT EXECUTE
+ON AGGREGATE FUNCTION HllDistinctCount
+TO PUBLIC;
+
 
