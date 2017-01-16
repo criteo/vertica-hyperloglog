@@ -1,59 +1,109 @@
+#include <bitset>
 #include "Vertica.h"
-#include <time.h> 
+#include <time.h>
 #include <sstream>
 #include <iostream>
-#include <functional>
+
 
 #define HLL_ARRAY_SIZE_PARAMETER_NAME "hllLeadingBits"
 #define HLL_ARRAY_SIZE_DEFAULT_VALUE 4
-#define NO_ONE_IN_BINARY 65
+#define HASH_SEED 27072015
 
 using namespace Vertica;
 
 class HllCreateSynopsis : public AggregateFunction
 {
 
+  static const uint8_t zeroValue = 48;
   vint hllLeadingBits;
-  size_t bucketMask;
-  size_t valueMask;
-  size_t shift;
-  std::hash<size_t> hashFunction;
+  uint64_t bucketMask;
+  uint64_t valueMask;
+  uint64_t synopsisSize;
+  vint shift;
 
-  size_t bucket(size_t hash) {
+  uint8_t bucket(uint64_t hash) {
       // Get the most significant bits and shift that
       return (hash & bucketMask) >> shift;
   }
 
-  int8_t leftMostSetBit(size_t hash) {
+  uint8_t leftMostSetBit(uint64_t hash) {
       // We set the bucket bits to 0
       if (hash == 0)
         return 0;
       else
-        return __builtin_clz(hash & valueMask) + 1 - hllLeadingBits;
+        return zeroValue + __builtin_clzll(hash & valueMask) + 1 - hllLeadingBits;
+  }
+
+  void printSynopsis(ServerInterface &srvInterface, uint8_t synopsis[]) {
+        std::string value = "";
+        for (uint64_t i = 0; i < synopsisSize; i++)
+        {
+          value += std::to_string(synopsis[i]) + ",";
+        }
+        srvInterface.log(value.c_str());
+  }
+
+
+  void printBinaryStr(ServerInterface &srvInterface, uint64_t value)
+  {
+    srvInterface.log("%u => %s", value, std::bitset<64>(value).to_string().c_str());
+  }
+
+  uint64_t murmurHash( const void * key, int len, unsigned int seed )
+  {
+    const uint64_t m = 0xc6a4a7935bd1e995;
+    const int r = 47;
+    uint64_t h = seed ^ (len * m);
+    const uint64_t * data = (const uint64_t *)key;
+    const uint64_t * end = data + (len/8);
+    while(data != end)
+    {
+      uint64_t k = *data++;
+      k *= m;
+      k ^= k >> r;
+      k *= m;
+      h ^= k;
+      h *= m;
+    }
+    const unsigned char * data2 = (const unsigned char*)data;
+    switch(len & 7)
+    {
+      case 7: h ^= uint64_t(data2[6]) << 48;
+      case 6: h ^= uint64_t(data2[5]) << 40;
+      case 5: h ^= uint64_t(data2[4]) << 32;
+      case 4: h ^= uint64_t(data2[3]) << 24;
+      case 3: h ^= uint64_t(data2[2]) << 16;
+      case 2: h ^= uint64_t(data2[1]) << 8;
+      case 1: h ^= uint64_t(data2[0]);
+      h *= m;
+    };
+    h ^= h >> r;
+    h *= m;
+    h ^= h >> r;
+    return h;
   }
 
   public:
-    virtual void setup(ServerInterface &srvInterface, 
-                       const SizedColumnTypes &argTypes) {
-
-        ParamReader paramReader= srvInterface.getParamReader();
-        if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) );
-            vt_report_error(0, "Parameter HLL_ARRAY_SIZE_PARAMETER_NAME is mandatory");
-        hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
-        shift = sizeof(size_t) * 8 - hllLeadingBits; 
-
-        // Ex: with a 4 bits bucket on a 2 bytes size_t we want 1111 0000 0000 0000
-        // So that's 10000 minus 1 shifted with 12 zeroes 1111 0000 0000 0000
-        bucketMask = (( 1 << hllLeadingBits ) - 1) >> shift;
-        // Ex: with a 4 bits bucket on a 16 bit size_t  we want 0000 1111 1111 1111
-        // So that's 1 with 12 ( 16 - 4 ) zeroes 0001 0000 0000 0000, minus one = 0000 1111 1111 1111
-        valueMask = (1 << shift ) - 1;
-    }
 
     virtual void initAggregate(ServerInterface &srvInterface, IntermediateAggs &aggs)
     {
+        ParamReader paramReader= srvInterface.getParamReader();
+        if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
+            vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
+        hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
+        synopsisSize = 1UL << hllLeadingBits;
+        shift = sizeof(vint) * 8 - hllLeadingBits;
+
+        // Ex: with a 4 bits bucket on a 2 bytes size_t we want 1111 0000 0000 0000
+        // So that's 10000 minus 1 shifted with 12 zeroes 1111 0000 0000 0000
+        bucketMask = (( 1UL << hllLeadingBits ) - 1UL) << shift;
+        // Ex: with a 4 bits bucket on a 16 bit size_t  we want 0000 1111 1111 1111
+        // So that's 1 with 12 ( 16 - 4 ) zeroes 0001 0000 0000 0000, minus one = 0000 1111 1111 1111
+        valueMask = (1UL << shift ) - 1UL;
+
         VString serializedSynopsis = aggs.getStringRef(0);
-        int8_t synopsis[2 ^ hllLeadingBits ] = {};
+        uint8_t synopsis[synopsisSize];
+        memset( synopsis, zeroValue, sizeof(synopsis) );
         serializedSynopsis.copy(reinterpret_cast<char*>(synopsis));
     }
 
@@ -61,33 +111,35 @@ class HllCreateSynopsis : public AggregateFunction
                    BlockReader &argReader,
                    IntermediateAggs &aggs)
     {
-      int8_t (&currentSynopsis)[2 ^ hllLeadingBits] = *reinterpret_cast<int8_t(*)[2 ^ hllLeadingBits]>(aggs.getStringRef(0).data());
+      uint8_t (&currentSynopsis)[synopsisSize] = *reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data());
       do {
-        size_t hash = hashFunction(argReader.getIntRef(0));
+        uint64_t hash = murmurHash(&argReader.getIntRef(0), 8, HASH_SEED);
         // We store in the synopsis for the the biggest leftmost one
-        currentSynopsis[bucket(hash)] = max(currentSynopsis[bucket(hash)], leftMostSetBit(hash)); 
+        currentSynopsis[bucket(hash)] = max(currentSynopsis[bucket(hash)], leftMostSetBit(hash));
       } while (argReader.next());
     }
 
-    virtual void combine(ServerInterface &srvInterface, 
-                         IntermediateAggs &aggs, 
+    virtual void combine(ServerInterface &srvInterface,
+                         IntermediateAggs &aggs,
                          MultipleIntermediateAggs &aggsOther)
     {
-      int8_t (&currentSynopsis)[2 ^ hllLeadingBits] = *reinterpret_cast<int8_t(*)[2 ^ hllLeadingBits]>(aggs.getStringRef(0).data());
+      uint8_t (&currentSynopsis)[synopsisSize] = *reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data());
       do {
-        size_t hash = hashFunction(aggsOther.getIntRef(0));
+        const uint8_t (&otherSynopsis)[synopsisSize] = *reinterpret_cast<const uint8_t(*)[synopsisSize]>(aggsOther.getStringRef(0).data());
         // We store in the synopsis for the the biggest leftmost one
-        currentSynopsis[bucket(hash)] = max(currentSynopsis[bucket(hash)], leftMostSetBit(hash));
+        for (uint64_t i = 0; i < synopsisSize; i++)
+        {
+          currentSynopsis[i] = std::max(currentSynopsis[i], otherSynopsis[i]);
+        }
       } while (aggsOther.next());
     }
 
-    virtual void terminate(ServerInterface &srvInterface, 
-                           BlockWriter &resWriter, 
+    virtual void terminate(ServerInterface &srvInterface,
+                           BlockWriter &resWriter,
                            IntermediateAggs &aggs)
     {
-      const VString &synopsis = aggs.getStringRef(0);
-      VString &result = resWriter.getStringRef();
-      result.copy(&synopsis);
+      resWriter.getStringRef().copy(aggs.getStringRef(0).data());
+      resWriter.next();
     }
 
     InlineAggregate()
@@ -109,28 +161,28 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
                                       const SizedColumnTypes &inputTypes,
                                       SizedColumnTypes &intermediateTypeMetaData)
     {
-       intermediateTypeMetaData.addVarbinary(64 * 2 ^ readSubStreamBits(srvInterface));
+        intermediateTypeMetaData.addVarbinary(8 * (1UL << readSubStreamBits(srvInterface)));
     }
-   
+
 
     virtual void getPrototype(ServerInterface &srvInterface,
-                              ColumnTypes &argTypes, 
+                              ColumnTypes &argTypes,
                               ColumnTypes &returnType)
     {
         argTypes.addInt();
-        returnType.addInt();
+        returnType.addVarbinary();
     }
 
-    virtual void getReturnType(ServerInterface &srvInterface, 
-                               const SizedColumnTypes &inputTypes, 
+    virtual void getReturnType(ServerInterface &srvInterface,
+                               const SizedColumnTypes &inputTypes,
                                SizedColumnTypes &outputTypes)
     {
-        outputTypes.addVarbinary(64 * 2 ^ readSubStreamBits(srvInterface));
+       outputTypes.addVarbinary(8 * (1UL << readSubStreamBits(srvInterface)));
     }
 
     virtual AggregateFunction *createAggregateFunction(ServerInterface &srvInterface)
     {
-      return vt_createFuncObject<HllCreateSynopsis>(srvInterface.allocator);
+        return vt_createFuncObject<HllCreateSynopsis>(srvInterface.allocator);
     }
 
     virtual void getParameterType(ServerInterface &srvInterface,
