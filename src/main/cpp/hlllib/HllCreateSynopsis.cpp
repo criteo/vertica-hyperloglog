@@ -24,36 +24,33 @@ class HllCreateSynopsis : public AggregateFunction
         if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
             vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
         hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
-        Hll* initialHll = new Hll(hllLeadingBits);
-        this -> synopsisSize = initialHll -> getSynopsisSize();
-        aggs.getStringRef(0).copy(reinterpret_cast<char*>(initialHll->getCurrentSynopsis()), synopsisSize);
-        delete initialHll;
+        Hll initialHll(hllLeadingBits);
+        this -> synopsisSize = initialHll.getSynopsisSize();
+        aggs.getStringRef(0).copy(reinterpret_cast<char*>(initialHll.getCurrentSynopsis()), synopsisSize);
     }
 
     void aggregate(ServerInterface &srvInterface,
                    BlockReader &argReader,
                    IntermediateAggs &aggs)
     {
-      Hll* outputHll = new Hll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
       do {
         const vint &currentValue = argReader.getIntRef(0);
-        outputHll->add(currentValue);
+        outputHll.add(currentValue);
       } while (argReader.next());
-      aggs.getStringRef(0).copy(reinterpret_cast<char*>(outputHll->getCurrentSynopsis()), synopsisSize);
-      delete outputHll;
+      aggs.getStringRef(0).copy(reinterpret_cast<char*>(outputHll.getCurrentSynopsis()), synopsisSize);
     }
 
     virtual void combine(ServerInterface &srvInterface,
                          IntermediateAggs &aggs,
                          MultipleIntermediateAggs &aggsOther)
     {
-      Hll* outputHll = new Hll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
       do {
         const uint8_t (&currentSynopsis)[synopsisSize] = *reinterpret_cast<const uint8_t(*)[synopsisSize]>(aggsOther.getStringRef(0).data());
-        outputHll->add(currentSynopsis);
+        outputHll.add(currentSynopsis);
       } while (aggsOther.next());
-      aggs.getStringRef(0).copy(reinterpret_cast<char*>(outputHll->getCurrentSynopsis()), synopsisSize);
-      delete outputHll;
+      aggs.getStringRef(0).copy(reinterpret_cast<char*>(outputHll.getCurrentSynopsis()), synopsisSize);
     }
 
     virtual void terminate(ServerInterface &srvInterface,
