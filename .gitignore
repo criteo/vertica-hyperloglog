@@ -1,0 +1,6 @@
+Makefile
+build
+src/build
+tests/build
+*.swp
+*~
