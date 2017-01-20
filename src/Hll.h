@@ -18,13 +18,14 @@ class Hll {
     uint64_t valueMask;
     uint8_t* synopsis;
 
-  	uint8_t leftMostSetBit(uint64_t hash);
-	uint64_t murmurHash(const void * key, int len, unsigned int seed);
-	void init(uint8_t bucketBits);
+    uint8_t leftMostSetBit(uint64_t hash) const;
+    uint64_t murmurHash(const void * key, int len, unsigned int seed) const;
+    void init(uint8_t bucketBits);
 
   public:
   	uint8_t* getCurrentSynopsis();
-    uint64_t getSynopsisSize();
+    uint64_t getSynopsisSize() const;
+    uint64_t getNumberOfBuckets() const;
     uint64_t approximateCountDistinct();
     void add(uint64_t value);
     void add(const uint8_t otherSynopsis[]);

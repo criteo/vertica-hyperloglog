@@ -5,7 +5,7 @@
 
 #include "Hll.h"
 
-uint64_t Hll::murmurHash( const void * key, int len, unsigned int seed )
+uint64_t Hll::murmurHash( const void * key, int len, unsigned int seed ) const
 {
   const uint64_t m = 0xc6a4a7935bd1e995;
   const int r = 47;
@@ -47,7 +47,7 @@ uint64_t Hll::bucket(uint64_t hash) {
   return (hash & bucketMask) >> shift;
 }
 
-uint8_t Hll::leftMostSetBit(uint64_t hash) {
+uint8_t Hll::leftMostSetBit(uint64_t hash) const {
   // We set the bucket bits to 0
   if (hash == 0)
     return 0;
