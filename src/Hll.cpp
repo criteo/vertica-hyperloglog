@@ -134,6 +134,8 @@ uint64_t Hll::approximateCountDistinct() {
       break;
     case 6:
       alpha = 0.709;
+    case 14:
+      alpha = (0.7213 / (1.0 + (1.079 / (1<<14)))); //0.721253
     default:
       alpha = (0.7213 / (1.0 + (1.079 / static_cast<double>(numberOfBuckets))));
   }
