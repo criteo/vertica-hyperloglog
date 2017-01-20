@@ -52,7 +52,12 @@ uint8_t Hll::leftMostSetBit(uint64_t hash) const {
   if (hash == 0)
     return 0;
   else
-    return ZERO_VALUE + __builtin_clzll(hash & valueMask) + 1 - bucketBits;
+    /**
+     * clz returns number of leading zero bits couting from the MSB
+     * we have to add 1 to count the set bit
+     * then we subtract bucketBits, since they are zeroed by valueMask
+     */
+    return (uint8_t)__builtin_clzll(hash & valueMask) + 1 - bucketBits;
 }
 
 void Hll::init(uint8_t bucketBits) {
@@ -75,7 +80,7 @@ void Hll::init(uint8_t bucketBits) {
 Hll::Hll(uint8_t bucketBits) {
   init(bucketBits);
   //TODO: This will not work when buckets won't be a single byte
-  memset( synopsis, ZERO_VALUE, numberOfBuckets );
+  memset( synopsis, 0, numberOfBuckets );
 }
 
 Hll::Hll(const uint8_t* synopsis, uint8_t bucketBits) {
@@ -134,7 +139,7 @@ uint64_t Hll::approximateCountDistinct() {
   }
   for (uint64_t i = 0; i < numberOfBuckets; i++)
   {
-      harmonicMean += 1.0 / (1 << (synopsis[i] - ZERO_VALUE));
+      harmonicMean += 1.0 / (1 << (synopsis[i]));
   }
   harmonicMean = numberOfBuckets / harmonicMean;
   return std::llround(0.5 + alpha * harmonicMean * numberOfBuckets);

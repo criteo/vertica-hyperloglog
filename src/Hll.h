@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #define HASH_SEED 27072015
-#define ZERO_VALUE 48
 
 #ifndef _HLL_H_
 #define _HLL_H_
