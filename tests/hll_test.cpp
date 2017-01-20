@@ -9,57 +9,113 @@
 
 namespace {
 
-// The fixture for testing class Foo.
 class HllTest : public ::testing::Test {
  protected:
-  // You can remove any or all of the following functions if its body
-  // is empty.
+  const std::string ids_filepath = "../data/ids.dat";
+  std::ifstream data_file;
 
   HllTest() {
-    // You can do set-up work for each test here.
   }
 
   virtual ~HllTest() {
     // You can do clean-up work that doesn't throw exceptions here.
   }
 
-  // If the constructor and destructor are not enough for setting up
-  // and cleaning up each test, you can define the following methods:
-
   virtual void SetUp() {
-    // Code here will be called immediately after the constructor (right
-    // before each test).
+    data_file = std::ifstream(ids_filepath, std::ifstream::in);
+    // ignore the first line of the data file; it contains a comment
+    data_file.ignore(256, '\n');
   }
 
   virtual void TearDown() {
-    // Code here will be called immediately after each test (right
-    // before the destructor).
+    data_file.close();
   }
 
-  // Objects declared here can be used by all tests in the test case for Foo.
 };
 
-TEST_F(HllTest, TestResultIsRepeatable) {
-}
 
-// Tests that the Foo::Bar() method does Abc.
-TEST_F(HllTest, TestEstimateFor14Bits) {
-  const std::string ids_filepath = "data/ids.dat";
+// TEST_F(HllTest, TestMoreBucketsYieldHigherEstimate) {
+//   Hll hll8(8);
+//   Hll hll10(10);
+//   Hll hll12(12);
+//   Hll hll14(14);
+
+//   for(uint32_t id; data_file >> id;) {
+//     hll8.add(id);
+//     hll10.add(id);
+//     hll12.add(id);
+//     hll14.add(id);
+//   }
+
+//   EXPECT_GE(hll14.approximateCountDistinct(), hll12.approximateCountDistinct());
+//   EXPECT_GE(hll12.approximateCountDistinct(), hll10.approximateCountDistinct());
+//   EXPECT_GE(hll10.approximateCountDistinct(), hll8.approximateCountDistinct());
+// }
+
+
+/**
+ * Since the estimate is proportional to a harmonic mean of bucketed values
+ * growing monotonically, adding new elements should never make the estimate
+ * lower.
+ */
+TEST_F(HllTest, TestEstimateGrowsMonotonically) {
   Hll hll(14);
 
-  std::ifstream data_file(ids_filepath, std::ifstream::in);
+  uint32_t counter = 0;
+  uint64_t prevEstimate = 0;
+  for(uint32_t id; data_file >> id;) {
+    hll.add(id);
+    ++counter;
+    if(counter % 100000 == 0) { // check how the estimate behaves every 100k elements
+      uint64_t curEstimate = hll.approximateCountDistinct();
+      EXPECT_GE(curEstimate, prevEstimate);
+      prevEstimate = curEstimate;
+    }
+  }
 
-  // ignore the first line of the data file - it contains a comment
-  data_file.ignore(256, '\n');
-  for(uint64_t i=0; i<10000000; ++i) {
-    uint32_t id;
-    data_file >> id;
+}
+
+
+/**
+ * Adding items already seen should never decrease the estimate. Since they
+ * were already hashed and inserted into corresponding bucket, this bucket
+ * either contains the same value or a larger one. If it's larger, adding
+ * already seen value will not change it.
+ */
+TEST_F(HllTest, TestAlreadySeenItemsDontChangeEstimate) {
+  Hll hll(14);
+
+  for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
 
-  std::cout << hll.approximateCountDistinct() << std::endl;
-  EXPECT_EQ(true, true);
-  //EXPECT_EQ(0, f.Bar(input_filepath, output_filepath));
+  auto firstEstimate = hll.approximateCountDistinct();
+
+  data_file.seekg(0); // go back to the beginning
+  data_file.ignore(256, '\n');
+
+  for(uint32_t id; data_file >> id;) {
+    hll.add(id);
+  }
+
+  EXPECT_EQ(firstEstimate, hll.approximateCountDistinct());
+}
+
+
+/**
+ * Test whether an estimate for 1M numbers with cardinality=630k will fall
+ * within 1% from the real value.
+ */
+TEST_F(HllTest, TestErrorBelowOnePercentFor14Bits) {
+  Hll hll(14);
+
+  for(uint32_t id; data_file >> id;) {
+    hll.add(id);
+  }
+
+  uint32_t realCardinality = 632055;
+  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
+  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
 }
 
 
