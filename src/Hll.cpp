@@ -41,10 +41,10 @@ uint64_t Hll::murmurHash( const void * key, int len, unsigned int seed ) const
 
 uint64_t Hll::bucket(uint64_t hash) {
   // Get the most significant bits and shift that
-  // For example on a 16-bit platform, with a 4 bit bucketMask (shift = 12)
+  // For example on a 16-bit platform, with a 4 bit bucketMask (valueBits = 12)
   // The value 0110 0111 0101 0001 is first bit masked to 0110 0000 0000 0000
   // And right shifted by 12 bits, which gives 0110, bucket 6.
-  return (hash & bucketMask) >> shift;
+  return (hash & bucketMask) >> valueBits;
 }
 
 uint8_t Hll::leftMostSetBit(uint64_t hash) const {
@@ -57,28 +57,30 @@ uint8_t Hll::leftMostSetBit(uint64_t hash) const {
 
 void Hll::init(uint8_t bucketBits) {
   this -> bucketBits = bucketBits;
-  this -> synopsisSize = 1UL << bucketBits;
-  this -> shift = 64 - bucketBits;
+  this -> valueBits = 64 - bucketBits;
+  this -> numberOfBuckets = 1UL << bucketBits;
+  this -> bucketSize = 1;
 
   // Ex: with a 4 bits bucket on a 2 bytes size_t we want 1111 0000 0000 0000
   // So that's 10000 minus 1 shifted with 12 zeroes 1111 0000 0000 0000
-  this -> bucketMask = (( 1UL << bucketBits ) - 1UL) << shift;
+  this -> bucketMask = (( 1UL << bucketBits ) - 1UL) << valueBits;
 
   // Ex: with a 4 bits bucket on a 16 bit size_t  we want 0000 1111 1111 1111
   // So that's 1 with 12 ( 16 - 4 ) zeroes 0001 0000 0000 0000, minus one = 0000 1111 1111 1111
-  this -> valueMask = (1UL << shift ) - 1UL;
+  this -> valueMask = (1UL << valueBits ) - 1UL;
 
-  this -> synopsis = new uint8_t[synopsisSize];
+  this -> synopsis = new uint8_t[numberOfBuckets];
 }
 
 Hll::Hll(uint8_t bucketBits) {
   init(bucketBits);
-  memset( synopsis, ZERO_VALUE, synopsisSize );
+  //TODO: This will not work when buckets won't be a single byte
+  memset( synopsis, ZERO_VALUE, numberOfBuckets );
 }
 
-Hll::Hll(uint8_t *synopsis, uint8_t bucketBits) {
+Hll::Hll(const uint8_t* synopsis, uint8_t bucketBits) {
   init(bucketBits);
-  for(uint64_t i = 0; i < synopsisSize; i++) {
+  for(uint64_t i = 0; i < numberOfBuckets; i++) {
     this -> synopsis[i] = synopsis[i];
   }
 }
@@ -94,7 +96,7 @@ void Hll::add(uint64_t value) {
 }
 
 void Hll::add(const uint8_t otherSynopsis[]) {
-  for (uint64_t i = 0; i < synopsisSize; i++) {
+  for (uint64_t i = 0; i < numberOfBuckets; i++) {
     synopsis[i] = std::max(synopsis[i], otherSynopsis[i]);
   }
 }
@@ -103,8 +105,15 @@ uint8_t* Hll::getCurrentSynopsis() {
   return this -> synopsis;
 }
 
-uint64_t Hll::getSynopsisSize() {
-  return this -> synopsisSize;
+uint64_t Hll::getNumberOfBuckets() const {
+  return this -> numberOfBuckets;
+}
+
+/**
+ * @return Size of synopsis in bytes
+ */
+uint64_t Hll::getSynopsisSize() const {
+  return this -> numberOfBuckets * bucketSize;
 }
 
 uint64_t Hll::approximateCountDistinct() {
@@ -121,13 +130,12 @@ uint64_t Hll::approximateCountDistinct() {
     case 6:
       alpha = 0.709;
     default:
-      alpha = (0.7213 / (1.0 + (1.079 / static_cast<double>(synopsisSize))));
+      alpha = (0.7213 / (1.0 + (1.079 / static_cast<double>(numberOfBuckets))));
   }
-
-  for (uint64_t i = 0; i < synopsisSize; i++)
+  for (uint64_t i = 0; i < numberOfBuckets; i++)
   {
       harmonicMean += 1.0 / (1 << (synopsis[i] - ZERO_VALUE));
   }
-  harmonicMean = synopsisSize / harmonicMean;
-  return std::round(0.5 + alpha * harmonicMean * synopsisSize);
+  harmonicMean = numberOfBuckets / harmonicMean;
+  return std::llround(0.5 + alpha * harmonicMean * numberOfBuckets);
 }
