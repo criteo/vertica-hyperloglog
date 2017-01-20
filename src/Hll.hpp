@@ -163,6 +163,11 @@ class Hll {
     }
   }
 
+  void add(const Hll<T>& other) {
+    assert(this->numberOfBuckets == other.numberOfBuckets);
+    this->add(other.synopsis); 
+  }
+
   uint8_t* getCurrentSynopsis() {
     return this -> synopsis;
   }
