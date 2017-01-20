@@ -47,7 +47,7 @@ class MurMurHash<uint32_t> : public Hash<uint32_t>{
     }
 };
 
-template<typename T>
+template<typename T, typename H = MurMurHash<T> >
 class Hll {
   private:
     uint8_t bucketBits;
