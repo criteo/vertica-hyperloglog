@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include "Vertica.h"
-#include "Hll.h"
+#include "Hll.hpp"
 
 #define HLL_ARRAY_SIZE_PARAMETER_NAME "hllLeadingBits"
 #define HLL_ARRAY_SIZE_DEFAULT_VALUE 4
@@ -25,7 +25,7 @@ class HllCreateSynopsis : public AggregateFunction
         if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
             vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
         hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
-        Hll initialHll(hllLeadingBits);
+        Hll<uint64_t> initialHll(hllLeadingBits);
         this -> synopsisSize = initialHll.getSynopsisSize();
         aggs.getStringRef(0).copy(reinterpret_cast<char*>(initialHll.getCurrentSynopsis()), synopsisSize);
     }
@@ -34,7 +34,7 @@ class HllCreateSynopsis : public AggregateFunction
                    BlockReader &argReader,
                    IntermediateAggs &aggs)
     {
-      Hll outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll<uint64_t> outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
       do {
         const vint &currentValue = argReader.getIntRef(0);
         outputHll.add(currentValue);
@@ -46,7 +46,7 @@ class HllCreateSynopsis : public AggregateFunction
                          IntermediateAggs &aggs,
                          MultipleIntermediateAggs &aggsOther)
     {
-      Hll outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll<uint64_t> outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
       do {
         const uint8_t (&currentSynopsis)[synopsisSize] = *reinterpret_cast<const uint8_t(*)[synopsisSize]>(aggsOther.getStringRef(0).data());
         outputHll.add(currentSynopsis);

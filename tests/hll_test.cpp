@@ -33,6 +33,58 @@ class HllTest : public ::testing::Test {
 
 };
 
+class DummyHash : public Hash<uint64_t> {
+public:
+  uint64_t operator()(uint64_t) const override {
+    return 0x1;
+  }
+};
+
+class StdHash : public Hash<uint64_t> {
+public:
+  uint64_t operator()(uint64_t val) const override {
+    return std::hash<uint64_t>()(val);
+  }
+};
+
+TEST_F(HllTest, TestStdHash) {
+  /**
+   * std::hash is a C++11 standard hashing function. We don't use it in our
+   * code as the actual hash function is not specified by the standard,
+   * therefore is not guaranteed not to be the same between platforms or even
+   * between different libstdc++ releases.
+   * However, it should still be as good as MurMurHash, therefore we in this
+   * test we make sure it really works
+   */
+  Hll<uint64_t, StdHash> hll(14);
+
+  for(uint32_t id; data_file >> id;) {
+    hll.add(id);
+  }
+
+  const uint32_t realCardinality = 632055;
+  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
+  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
+}
+TEST_F(HllTest, TestErrorWithinRangeForDifferentBucketMasks) {
+  /**
+   * We create a bunch of different HLL synopsis with bucket masks spreading
+   * from 8 to 16. We store them together with the precision parameter
+   * in order to be able to estimate the relative error later on.
+   */
+  std::vector<std::pair<uint8_t, Hll<uint64_t>>> hlls = { {6, {6}},
+      {8,  {8} },
+      {10, {10}},
+      {12, {12}},
+      {14, {14}},
+      {16, {16}}
+    };
+
+  for(uint64_t id; data_file >> id;) {
+    for(auto& bits_hll: hlls)
+      bits_hll.second.add(id);
+  }
+
 
 // TEST_F(HllTest, TestMoreBucketsYieldHigherEstimate) {
 //   Hll hll8(8);

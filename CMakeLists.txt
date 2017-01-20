@@ -12,10 +12,10 @@ set(CMAKE_CXX_FLAGS "-g -Wall -O3 -std=c++11 -Wno-unused-value -fPIC")
 # Here we say where g++ should look for include files
 set(SDK_HOME /opt/vertica/sdk)
 set(VERTICA_INCLUDE ${SDK_HOME}/include)
-include_directories(${VERTICA_INCLUDE} include)
+include_directories(${VERTICA_INCLUDE} include src)
 
 # Here we add all source files to appear in libhll.so
-set(SOURCES src/Hll.cpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h)
+set(SOURCES src/Hll.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h)
 add_library(hll SHARED ${SOURCES})
 
 # Below we define a variable BUILD_TESTS which can be toggled e.g. with ccmake
@@ -28,11 +28,11 @@ if (BUILD_TESTS)
 
   # Include the gtest library. gtest_SOURCE_DIR is available due to
   # inclusion of googletest subdirectory with another cmake file 
-  include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+  include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} src)
 
   # Linking to Hll.cpp. We can't link to libhll.so, because there would
   # be some symbols missing, e.g. Vertica::dummy()
-  add_executable(hll_test tests/hll_test.cpp src/Hll.cpp)
+  add_executable(hll_test tests/hll_test.cpp)
 
   # Standard linking to googletest stuff.
   target_link_libraries(hll_test gtest gtest_main)
