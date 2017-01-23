@@ -112,6 +112,40 @@ class Hll {
     }
   }
 
+  /** Copy constructor */
+  Hll(const Hll& other) : bucketBits(other.bucketBits),
+    valueBits(other.valueBits),
+    numberOfBuckets(other.numberOfBuckets),
+    bucketSize(other.bucketSize),
+    bucketMask(other.bucketMask),
+    valueMask(other.valueMask),
+    synopsis(new uint8_t[other.numberOfBuckets]) {
+    memcpy(synopsis, other.synopsis, numberOfBuckets);
+  }
+
+  /** Move constructor */
+  Hll(Hll&& other) noexcept : bucketBits(other.bucketBits),
+    valueBits(other.valueBits),
+    numberOfBuckets(other.numberOfBuckets),
+    bucketSize(other.bucketSize),
+    bucketMask(other.bucketMask),
+    valueMask(other.valueMask) {
+      std::swap(synopsis, other.synopsis);
+    }
+
+  /** Copy assignment operator */
+  Hll& operator=(const Hll& other) {
+    Hll tmp(other);
+    *this = std::move(other);
+    return *this;
+  }
+
+  /** Move assignment operator */
+  Hll& operator=(Hll&& other) noexcept {
+    std::swap(other);
+    return *this;
+  }
+
   ~Hll() {
     delete[] synopsis;
   }
