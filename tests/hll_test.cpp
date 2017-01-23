@@ -11,6 +11,7 @@
 
 namespace {
 
+
 class HllTest : public ::testing::Test {
  protected:
   const std::string ids_filepath = "../data/ids.dat";
@@ -42,31 +43,31 @@ public:
   }
 };
 
-class StdHash : public Hash<uint64_t> {
+class KnuthHash : public Hash<uint32_t> {
 public:
-  uint64_t operator()(uint64_t val) const override {
-    return std::hash<uint64_t>()(val);
+  uint64_t operator()(uint32_t val) const override {
+    uint64_t left_half  = ((static_cast<uint64_t>(val)*2654435761) % (1ULL << 32)) << 32;
+    uint64_t right_half =  (static_cast<uint64_t>(val)*2654435761) % (1ULL << 32);
+
+    return left_half | right_half;
   }
 };
 
-TEST_F(HllTest, TestStdHash) {
+TEST_F(HllTest, TestKnuthHash) {
   /**
-   * std::hash is a C++11 standard hashing function. We don't use it in our
-   * code as the actual hash function is not specified by the standard,
-   * therefore is not guaranteed not to be the same between platforms or even
-   * between different libstdc++ releases.
-   * However, it should still be as good as MurMurHash, therefore we in this
-   * test we make sure it really works
+   * This test uses a non-trivial hash function, but different than murmur.
+   * std::hash can't be used here, since in many implementations it's
+   * not random.
    */
-  Hll<uint64_t, StdHash> hll(14);
+  Hll<uint32_t, KnuthHash> hll(4);
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
 
   const uint32_t realCardinality = 632055;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
+  EXPECT_LT(hll.approximateCountDistinct(), 1.02*realCardinality);
+  EXPECT_GT(hll.approximateCountDistinct(), 0.98*realCardinality);
 }
 TEST_F(HllTest, TestErrorWithinRangeForDifferentBucketMasks) {
   /**
@@ -127,7 +128,6 @@ TEST_F(HllTest, TestDummyHashFunction) {
     hll.add(id);
   }
   auto millionElementsDummyCount = hll.approximateCountDistinct();
-
   ASSERT_EQ(singleElementDummyCount, millionElementsDummyCount);
 }
 
