@@ -65,14 +65,14 @@ class Hll {
  */
   static_assert(std::is_base_of<Hash<T>, H>::value,
     "Hll's H parameter has to be a subclass of Hash<T>");
-  private:
-    uint8_t bucketBits;
-    uint8_t valueBits;
-    uint64_t numberOfBuckets;
-    uint64_t bucketSize;
-    uint64_t bucketMask;
-    uint64_t valueMask;
-    uint8_t* synopsis;
+private:
+  uint8_t bucketBits;
+  uint8_t valueBits;
+  uint64_t numberOfBuckets;
+  uint64_t bucketSize;
+  uint64_t bucketMask;
+  uint64_t valueMask;
+  uint8_t* synopsis;
 
 
   uint8_t leftMostSetBit(uint64_t hash) const {
@@ -104,7 +104,7 @@ class Hll {
 
     this -> synopsis = new uint8_t[numberOfBuckets];
   }
-    public:
+public:
 
   uint64_t bucket(uint64_t hash) {
     // Get the most significant bits and shift that
@@ -266,7 +266,7 @@ class Hll {
 /**
  * We use dense representation for storing the buckets.
  * In the Hll class we store the synopsis as an array of 2^14 bytes. In fact,
- * since the counters use only 6 bits, when storing the synopsis on permanent
+ * since the counters use only 6 bits, when storing the synopsis on a permanent
  * storage we can compress it to 2^14 * 6 bits =  12288 bytes.
  * The idea is to split the buckets into groups of 4 and to store them in 3 bytes
  * (since 4 * 6 bits = 24 bits = 3 bytes).
