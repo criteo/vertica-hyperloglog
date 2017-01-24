@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cmath>
 #include <stdint.h>
+#include <type_traits>
 
 #define HASH_SEED 27072015
 
@@ -47,8 +48,20 @@ class MurMurHash<uint32_t> : public Hash<uint32_t>{
     }
 };
 
+/**
+ * T is the hashable type. The class can be used to count various types.
+ * H is a class deriving from Hash<T>
+ */
 template<typename T, typename H = MurMurHash<T> >
 class Hll {
+/**
+ * The line below is the fanciest thing I've ever done.
+ * This enforces in compile time that the H parameter is a subclass of Hash<T>.
+ *
+ * Weirdly, static_assert is not a member of std::
+ */
+  static_assert(std::is_base_of<Hash<T>, H>::value,
+    "Hll's H parameter has to be a subclass of Hash<T>");
   private:
     uint8_t bucketBits;
     uint8_t valueBits;
