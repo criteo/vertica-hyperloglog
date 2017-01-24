@@ -1,8 +1,11 @@
 #include <iostream>
 #include <cstring>
 #include <cmath>
+#include <memory>
 #include <stdint.h>
 #include <type_traits>
+#include <utility>
+#include <cassert>
 
 #define HASH_SEED 27072015
 
@@ -111,7 +114,17 @@ class Hll {
     return (hash & bucketMask) >> valueBits;
   }
 
-
+  /**
+   * Below we implement the C++11's rule of five.
+   * Since this class uses manual memory allocation, we have to to define:
+   * - copy constructor,
+   * - move constructor,
+   * - copy assignment,
+   * - move assignmnet,
+   * - destructor.
+   *
+   * See: https://en.wikipedia.org/wiki/Rule_of_three_(C%2B%2B_programming)
+   */
   Hll(uint8_t bucketBits) {
     init(bucketBits);
     //TODO: This will not work when buckets won't be a single byte
@@ -143,6 +156,9 @@ class Hll {
     bucketSize(other.bucketSize),
     bucketMask(other.bucketMask),
     valueMask(other.valueMask) {
+      // we swap the values, so that we get the synopsis from the temporary
+      // object, and the current synopsis will be destroyed together with
+      // the temporary object.
       std::swap(synopsis, other.synopsis);
     }
 
@@ -196,6 +212,27 @@ class Hll {
     return this -> numberOfBuckets * bucketSize;
   }
 
+  uint64_t getDenseRepresentationSize() const {
+    uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
+    uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
+    uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
+    return outputArraySize;
+  }
+
+  /**
+   * This function is a direct implementation of the formula presented in
+   * Flajolet's paper. According to it the cardinality estimation is calculated
+   * as follows:
+   *
+   * E = \alpha_m * m^2 * sum_{j=1}^m{2^{-M[j]}}
+   *
+   * where:
+   *    E is the estimation
+   *    \alpha_m is a constant derived from another formula
+   *    m is number of buckets
+   *    M[j] is count from the j-th bucket
+   * 
+   */
   uint64_t approximateCountDistinct() {
     double harmonicMean = 0.0;
     double alpha;
@@ -209,6 +246,7 @@ class Hll {
         break;
       case 6:
         alpha = 0.709;
+      // since 14 is our most common case, we make it computable in compile time
       case 14:
         alpha = (0.7213 / (1.0 + (1.079 / (1<<14)))); //0.721253
       default:
@@ -219,7 +257,63 @@ class Hll {
         harmonicMean += 1.0 / (1 << (synopsis[i]));
     }
     harmonicMean = numberOfBuckets / harmonicMean;
+    // std::llround returns a long long
+    // note: other rounding functions return a floating point or shorter types
     return std::llround(0.5 + alpha * harmonicMean * numberOfBuckets);
+  }
+
+
+/**
+ * We use dense representation for storing the buckets.
+ * In the Hll class we store the synopsis as an array of 2^14 bytes. In fact,
+ * since the counters use only 6 bits, when storing the synopsis on permanent
+ * storage we can compress it to 2^14 * 6 bits =  12288 bytes.
+ * The idea is to split the buckets into groups of 4 and to store them in 3 bytes
+ * (since 4 * 6 bits = 24 bits = 3 bytes).
+ *
+ * Hence, we use the following representation:
+ *
+ * +--------+--------+--------+---//
+ * |00000011|11112222|22333333|4444
+ * +--------+--------+--------+---//
+ *
+ * In order to deserialize an array of bytes into buckets, we iterate over
+ * groups of three bytes which get stored in four buckets.
+ * Likewise, to serialize the buckets, we iterate over groups of 4 buckets
+ * which get stored in three bytes.
+ *
+ * In the functions below it's essential to set value of a single byte in only
+ * one assignment. Otherwise we risk encountering a write after write hazard,
+ * which could make the operation significantly slower.
+ */
+
+  void deserializeFromDense6(uint8_t byte_array[], uint32_t length) {
+    assert(length % 3 == 0);
+    for(uint32_t gidx = 0; gidx < length/3; ++gidx) {
+      synopsis[gidx*4] = byte_array[gidx*3] >> 2;
+      synopsis[gidx*4+1] = ((byte_array[gidx*3] & 0x3) << 4) | (byte_array[gidx*3+1] >> 4);
+      synopsis[gidx*4+2] = ((byte_array[gidx*3+1] & 0xF) << 2) | (byte_array[gidx*3+2] >> 6);
+      synopsis[gidx*4+3] = (byte_array[gidx*3+2] & 0x3F);
+    }
+  }
+
+  std::pair<std::unique_ptr<uint8_t[]>, uint32_t> serializeToDense6() {
+    // this variable expresses number of bits per single bucket in the output array
+    uint32_t outputArraySize = getDenseRepresentationSize();
+    std::unique_ptr<uint8_t[]> outputArray(new uint8_t[outputArraySize]);
+
+    // Make sure that number of buckets is divisable by 4. 
+    // By design it's a power of two, but if some weird initializaion
+    // problem occured, we would not serialize some bcukets.
+    assert(numberOfBuckets % 4 == 0);
+    for(uint32_t gidx = 0; gidx < numberOfBuckets/4; ++gidx) {
+      outputArray[gidx*3]   = (synopsis[gidx*4] << 2)    | (synopsis[gidx*4+1] >> 4);
+      outputArray[gidx*3+1] = (synopsis[gidx*4+1] << 4)  | (synopsis[gidx*4+2] >> 2);
+      outputArray[gidx*3+2] = (synopsis[gidx*4+2] << 6 ) | synopsis[gidx*4+3];
+    }
+
+    // std::move is essential as std::unique_ptr don't support copy constructors
+    return std::make_pair(std::move(outputArray), outputArraySize);
   }
 
 };
