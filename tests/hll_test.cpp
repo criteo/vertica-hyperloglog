@@ -17,7 +17,7 @@ class HllTest : public ::testing::Test {
   const std::string ids_filepath = "../data/ids.dat";
   std::ifstream data_file;
 
-  HllTest() {
+  HllTest() : data_file{ids_filepath, std::ifstream::in} {
   }
 
   virtual ~HllTest() {
@@ -25,7 +25,7 @@ class HllTest : public ::testing::Test {
   }
 
   virtual void SetUp() {
-    data_file = std::ifstream(ids_filepath, std::ifstream::in);
+    data_file.seekg(0, data_file.beg);
     // ignore the first line of the data file; it contains a comment
     data_file.ignore(256, '\n');
   }
