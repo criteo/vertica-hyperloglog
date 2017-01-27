@@ -58,7 +58,7 @@ class HllCreateSynopsis : public AggregateFunction
                            BlockWriter &resWriter,
                            IntermediateAggs &aggs)
     {
-      resWriter.getStringRef().copy(aggs.getStringRef(0).data());
+      resWriter.getStringRef().copy(aggs.getStringRef(0).data(), synopsisSize);
       resWriter.next();
     }
 
