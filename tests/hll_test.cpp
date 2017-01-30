@@ -9,6 +9,8 @@
 #include "gtest/gtest.h"
 #include "Hll.hpp"
 
+using namespace std;
+
 namespace {
 
 
@@ -72,9 +74,11 @@ TEST_F(HllTest, TestSerializeDeserializeDense) {
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
-  std::unique_ptr<uint8_t[]> byte_array;
-  uint32_t length;
-  std::tie(byte_array, length) = hll.serializeToDense6();
+  uint32_t length = hll.getSynopsisSize(Format::DENSE);
+
+  cout << length << endl;
+  std::unique_ptr<char[]> byte_array(new char[length]);
+  hll.serialize(byte_array.get(), Format::DENSE);
   /**
    * Maybe we modify this as the codebase matures, but for the time being
    * we expect his fixed length
@@ -84,7 +88,7 @@ TEST_F(HllTest, TestSerializeDeserializeDense) {
   EXPECT_EQ(length, ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED);
 
   Hll<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserializeFromDense6(byte_array.get(), length);
+  deserialized_hll.deserialize(byte_array.get(), Format::DENSE);
 
   EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
@@ -100,22 +104,24 @@ TEST_F(HllTest, TestSerializeDeserializeDenseToFile) {
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
-  std::unique_ptr<uint8_t[]> byte_array;
-  uint32_t length;
-  std::tie(byte_array, length) = hll.serializeToDense6();
+
+  uint32_t length = hll.getSynopsisSize(Format::DENSE);
+
+  std::unique_ptr<char[]> byte_array(new char[length]);
+  hll.serialize(byte_array.get(), Format::DENSE);
   std::ofstream temp_file_out("tmp", std::ios::binary | std::ios::out);
-  temp_file_out.write(reinterpret_cast<char*>(byte_array.get()), length);
+  temp_file_out.write(byte_array.get(), length);
   temp_file_out.close();
 
   std::ifstream temp_file_in("tmp", std::ios::binary | std::ios::in);
-  std::unique_ptr<uint8_t[]> byte_array2(new uint8_t[length]);
-  temp_file_in.read(reinterpret_cast<char*>(byte_array2.get()), length);
+  std::unique_ptr<char[]> byte_array2(new char[length]);
+  temp_file_in.read(byte_array2.get(), length);
   temp_file_in.close();
   unlink("tmp");
 
 
   Hll<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserializeFromDense6(byte_array2.get(), length);
+  deserialized_hll.deserialize(byte_array2.get(), Format::DENSE);
 
   EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));

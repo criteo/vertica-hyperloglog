@@ -51,6 +51,8 @@ class MurMurHash<uint32_t> : public Hash<uint32_t>{
     }
 };
 
+enum class Format {SPARSE, DENSE};
+
 /**
  * T is the hashable type. The class can be used to count various types.
  * H is a class deriving from Hash<T>
@@ -105,6 +107,8 @@ private:
     this -> synopsis = new uint8_t[numberOfBuckets];
   }
 public:
+
+
 
   uint64_t bucket(uint64_t hash) {
     // Get the most significant bits and shift that
@@ -206,20 +210,6 @@ public:
   }
 
   /**
-   * @return Size of synopsis in bytes
-   */
-  uint64_t getSynopsisSize() const {
-    return this -> numberOfBuckets * bucketSize;
-  }
-
-  uint64_t getDenseRepresentationSize() const {
-    uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
-    uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
-    uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
-    return outputArraySize;
-  }
-
-  /**
    * This function is a direct implementation of the formula presented in
    * Flajolet's paper. According to it the cardinality estimation is calculated
    * as follows:
@@ -262,6 +252,44 @@ public:
     return std::llround(0.5 + alpha * harmonicMean * numberOfBuckets);
   }
 
+void deserialize(const char* byteArray, Format format) {
+  if(format == Format::SPARSE) {
+    for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
+      synopsis[i] = byteArray[i];
+    }
+  } else if (format == Format::DENSE) {
+    deserializeDense(byteArray);
+  }
+}
+
+
+void serialize(char* byteArray, Format format) const {
+  if(format == Format::SPARSE) {
+    for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
+      byteArray[i] = synopsis[i];
+    }
+  } else if (format == Format::DENSE) {
+    serializeDense(byteArray);
+  } else {
+    //TODO: replace it with an exception or sth more meaningful
+    assert(0);
+  }
+}
+
+uint32_t getSynopsisSize(Format format) {
+  if(format == Format::SPARSE) {
+    return numberOfBuckets * bucketSize;
+
+  } else if(format == Format::DENSE) {
+    uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
+    uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
+    uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
+    return outputArraySize;
+  } else {
+    //TODO: replace it with an exception or sth more meaningful
+    assert(0);
+  }
+}
 
 /**
  * We use dense representation for storing the buckets.
@@ -287,33 +315,26 @@ public:
  * which could make the operation significantly slower.
  */
 
-  void deserializeFromDense6(uint8_t byte_array[], uint32_t length) {
-    assert(length % 3 == 0);
-    for(uint32_t gidx = 0; gidx < length/3; ++gidx) {
-      synopsis[gidx*4] = byte_array[gidx*3] >> 2;
-      synopsis[gidx*4+1] = ((byte_array[gidx*3] & 0x3) << 4) | (byte_array[gidx*3+1] >> 4);
-      synopsis[gidx*4+2] = ((byte_array[gidx*3+1] & 0xF) << 2) | (byte_array[gidx*3+2] >> 6);
-      synopsis[gidx*4+3] = (byte_array[gidx*3+2] & 0x3F);
+  void deserializeDense(const char* byteArray1) {
+    //bgidx stands for bucket group index
+    //
+    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/4; ++bgidx) {
+      synopsis[bgidx*4] = byteArray[bgidx*3] >> 2;
+      synopsis[bgidx*4+1] = ((byteArray[bgidx*3] & 0x3) << 4) | (byteArray[bgidx*3+1] >> 4);
+      synopsis[bgidx*4+2] = ((byteArray[bgidx*3+1] & 0xF) << 2) | (byteArray[bgidx*3+2] >> 6);
+      synopsis[bgidx*4+3] = (byteArray[bgidx*3+2] & 0x3F);
     }
   }
 
-  std::pair<std::unique_ptr<uint8_t[]>, uint32_t> serializeToDense6() {
-    // this variable expresses number of bits per single bucket in the output array
-    uint32_t outputArraySize = getDenseRepresentationSize();
-    std::unique_ptr<uint8_t[]> outputArray(new uint8_t[outputArraySize]);
-
-    // Make sure that number of buckets is divisable by 4. 
-    // By design it's a power of two, but if some weird initializaion
-    // problem occured, we would not serialize some bcukets.
-    assert(numberOfBuckets % 4 == 0);
-    for(uint32_t gidx = 0; gidx < numberOfBuckets/4; ++gidx) {
-      outputArray[gidx*3]   = (synopsis[gidx*4] << 2)    | (synopsis[gidx*4+1] >> 4);
-      outputArray[gidx*3+1] = (synopsis[gidx*4+1] << 4)  | (synopsis[gidx*4+2] >> 2);
-      outputArray[gidx*3+2] = (synopsis[gidx*4+2] << 6 ) | synopsis[gidx*4+3];
+  void serializeDense(char* byteArray1) const {
+    //bgidx stands for bucket group index
+    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
+    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/4; ++bgidx) {
+      byteArray[bgidx*3]   = (synopsis[bgidx*4] << 2)    | (synopsis[bgidx*4+1] >> 4);
+      byteArray[bgidx*3+1] = (synopsis[bgidx*4+1] << 4)  | (synopsis[bgidx*4+2] >> 2);
+      byteArray[bgidx*3+2] = (synopsis[bgidx*4+2] << 6 ) | synopsis[bgidx*4+3];
     }
-
-    // std::move is essential as std::unique_ptr don't support copy constructors
-    return std::make_pair(std::move(outputArray), outputArraySize);
   }
 
 };

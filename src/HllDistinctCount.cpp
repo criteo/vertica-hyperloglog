@@ -11,6 +11,8 @@
 
 using namespace Vertica;
 
+const Format FORMAT = Format::SPARSE;
+
 class HllDistinctCount : public AggregateFunction
 {
 
@@ -26,20 +28,22 @@ class HllDistinctCount : public AggregateFunction
             vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
         hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
         Hll<uint64_t> initialHll(hllLeadingBits);
-        this -> synopsisSize = initialHll.getSynopsisSize();
-        aggs.getStringRef(0).copy(reinterpret_cast<char*>(initialHll.getCurrentSynopsis()), synopsisSize);
+        this -> synopsisSize = initialHll.getSynopsisSize(FORMAT);
+        initialHll.serialize(aggs.getStringRef(0).data(), FORMAT);
     }
 
     void aggregate(ServerInterface &srvInterface,
                    BlockReader &argReader,
                    IntermediateAggs &aggs)
     {
-      Hll<uint64_t> outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll<uint64_t> outputHll(hllLeadingBits);
+      outputHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       do {
-        const uint8_t (&currentSynopsis)[synopsisSize] = *reinterpret_cast<const uint8_t(*)[synopsisSize]>(argReader.getStringRef(0).data());
+        Hll<uint64_t> currentSynopsis(hllLeadingBits);
+        currentSynopsis.deserialize(argReader.getStringRef(0).data(), FORMAT);
         outputHll.add(currentSynopsis);
       } while (argReader.next());
-      aggs.getStringRef(0).copy(reinterpret_cast<char*>(outputHll.getCurrentSynopsis()), synopsisSize);
+      outputHll.serialize(aggs.getStringRef(0).data(), FORMAT);
 
     }
 
@@ -47,19 +51,22 @@ class HllDistinctCount : public AggregateFunction
                          IntermediateAggs &aggs,
                          MultipleIntermediateAggs &aggsOther)
     {
-      Hll<uint64_t> outputHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll<uint64_t> outputHll(hllLeadingBits);
+      outputHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       do {
-        const uint8_t (&currentSynopsis)[synopsisSize] = *reinterpret_cast<const uint8_t(*)[synopsisSize]>(aggsOther.getStringRef(0).data());
+        Hll<uint64_t> currentSynopsis(hllLeadingBits);
+        currentSynopsis.deserialize(aggsOther.getStringRef(0).data(), FORMAT);
         outputHll.add(currentSynopsis);
       } while (aggsOther.next());
-      aggs.getStringRef(0).copy(reinterpret_cast<char*>(outputHll.getCurrentSynopsis()), synopsisSize);
+      outputHll.serialize(aggs.getStringRef(0).data(), FORMAT);
     }
 
     virtual void terminate(ServerInterface &srvInterface,
                            BlockWriter &resWriter,
                            IntermediateAggs &aggs)
     {
-      Hll<uint64_t> finalHll(*reinterpret_cast<uint8_t(*)[synopsisSize]>(aggs.getStringRef(0).data()), hllLeadingBits);
+      Hll<uint64_t> finalHll(hllLeadingBits);
+      finalHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       resWriter.setInt(finalHll.approximateCountDistinct());
     }
 
@@ -82,7 +89,8 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
                                       const SizedColumnTypes &inputTypes,
                                       SizedColumnTypes &intermediateTypeMetaData)
     {
-        intermediateTypeMetaData.addVarbinary((1UL << readSubStreamBits(srvInterface)) + 1);
+      Hll<uint64_t> dummy(readSubStreamBits(srvInterface));
+      intermediateTypeMetaData.addVarbinary(dummy.getSynopsisSize(FORMAT));
     }
 
 
