@@ -18,6 +18,8 @@ include_directories(${VERTICA_INCLUDE} include src)
 set(SOURCES src/Hll.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp)
 add_library(hll SHARED ${SOURCES})
 
+add_executable(hll_driver tests/hll_driver.cpp)
+
 # Below we define a variable BUILD_TESTS which can be toggled e.g. with ccmake
 # It says whether the tests should be built at all
 if (BUILD_TESTS)
