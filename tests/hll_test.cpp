@@ -76,7 +76,6 @@ TEST_F(HllTest, TestSerializeDeserializeDense) {
   }
   uint32_t length = hll.getSynopsisSize(Format::DENSE);
 
-  cout << length << endl;
   std::unique_ptr<char[]> byte_array(new char[length]);
   hll.serialize(byte_array.get(), Format::DENSE);
   /**
@@ -179,7 +178,7 @@ TEST_F(HllTest, TestErrorWithinRangeForDifferentBucketMasks) {
     uint8_t basket_bits = bits_hll.first;
     Hll<uint64_t> hll = bits_hll.second;
     
-    uint64_t approximated_cardinality = hll.approximateCountDistinct();
+    int64_t approximated_cardinality = static_cast<uint64_t>(hll.approximateCountDistinct());
 
     uint32_t m = 2 << basket_bits;
     /**
@@ -212,30 +211,28 @@ TEST_F(HllTest, TestDummyHashFunction) {
 
 
 /**
- * This tests uses 15 bits for the bucket, which uses a diferent path in
- * Hll.approximateCountDistinct()
+ * This test whether the serialized synopses have expected lengths
+ * NOTE: Length of a synopsis depends on the used precision and chosen format.
  */
-TEST_F(HllTest, TestNonStandardBuckets) {
-  Hll<uint64_t> hll(15); //XXX: NOTE 15 bits
-
-  for(uint32_t id; data_file >> id;) {
-    hll.add(id);
+TEST_F(HllTest, TestNonStandardSynopsisSize) {
+  for(uint8_t precision=4; precision<=18; ++precision) {
+    Hll<uint64_t> hll(precision);
+    ASSERT_EQ(hll.getSynopsisSize(Format::SPARSE), 1<<precision);
+    // dense format is expected to go down by 3/4
+    // since 8 bits become 6
+    ASSERT_EQ(hll.getSynopsisSize(Format::DENSE), (1<<precision)*3/4);
   }
-
-  const uint32_t realCardinality = 632055;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
 }
 
 
 /**
- * This tests splits the input data set into two halfs. The first half is added
+ * This tests splits the input data set into two halves. The first half is added
  * to one Hll, the second half to another Hll. At the same time all the elements
  * are added to a third Hll. Assumption is that if we add to halfs of the input
  * data, we should get the same estimate as for having all the elements stored in
  * one Hll.
  */
-TEST_F(HllTest, TestSynopsisAdditionWorks) {
+TEST_F(HllTest, TestSynopsisAdditionAssociativity) {
   Hll<uint64_t> hll1(14), hll2(14), hll1plus2(14);
   std::vector<uint32_t> ids;
   ids.reserve(1000000); 
