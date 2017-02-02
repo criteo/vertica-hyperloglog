@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 #include <vector>
 #include "bias_corrected_estimate.hpp"
 
@@ -25,9 +26,11 @@ double BiasCorrectedEstimate::kNeighborsInterpolationBias(uint64_t rawEstimate, 
   std::vector<std::pair<uint32_t, double>> neighbors;
   for(uint32_t idx = lowerBoundIdx; idx < lowerBoundIdx+6; ++idx)
     neighbors.push_back(std::make_pair(idx, std::abs(rawEstimates[idx]-rawEstimate)));
-  for(uint32_t idx = lowerBoundIdx-1; idx >= 0 && idx >= lowerBoundIdx-6; --idx)
+  for(int32_t idx = lowerBoundIdx-1; idx >= 0 && idx >= lowerBoundIdx-6; --idx) {
     neighbors.push_back(std::make_pair(idx, std::abs(rawEstimates[idx]-rawEstimate)));
+  }
 
+  // sort pairs (idx, distanceFromHllEstimate) according to the second value
   std::sort(neighbors.begin(), neighbors.end(),
     [](std::pair<uint32_t, double> a, std::pair<uint32_t, double> b) {
         return a.second < b.second;
@@ -44,6 +47,13 @@ double BiasCorrectedEstimate::kNeighborsInterpolationBias(uint64_t rawEstimate, 
   return mean/6;
 }
 
+
+/** 
+ * This function yields a bias-corrected estimate based on raw HLL estimate.
+ * This is achieved by subtracting bias as measured by the Google guys
+ * 
+ * See: https://docs.google.com/document/d/1gyjfMHy43U9OWBXxfaeG-3MjGzejW1dlpyMwEYAAWEI/
+ */
 uint64_t BiasCorrectedEstimate::estimate(uint64_t rawEstimate, uint8_t precision) {
   assert(precision >= 4 && precision <= 18);
   return rawEstimate - kNeighborsInterpolationBias(rawEstimate, precision);

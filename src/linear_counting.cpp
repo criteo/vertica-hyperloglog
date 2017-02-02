@@ -8,6 +8,9 @@
 
 
 LinearCounting::LinearCounting(uint8_t prec) : precision(prec) {
+  // LC bitmap has to be at least 8 bytes long. To this end,
+  // precision ought to be greater or equal to 6.
+  assert(prec >= 6);
   bitmap = new uint8_t[bitmapSize()];
   memset(bitmap, 0, bitmapSize());
 }
@@ -77,10 +80,10 @@ void LinearCounting::add(uint64_t hashValue) {
   setBit(relevantBits);
 }
 
-uint64_t LinearCounting::getLinearCountingThreshold(uint32_t precision) const {
-  assert(precision >= 4 && precision <= 18);
+uint64_t LinearCounting::getLinearCountingThreshold(uint8_t hllPrecision) {
+  assert(hllPrecision >= 4 && hllPrecision <= 18);
   // we subtract 4 from precision since it's the minimal value
-  return linearCountingThreshold[precision-4];
+  return linearCountingThreshold[hllPrecision-4];
 }
 
 /**
@@ -89,6 +92,7 @@ uint64_t LinearCounting::getLinearCountingThreshold(uint32_t precision) const {
  *
  * where:
  *   m is size of the bitmap
+ *   S is number of unset bits (i.e. whose value =0)
  *   
  */
 uint64_t LinearCounting::estimate() const {
@@ -97,8 +101,15 @@ uint64_t LinearCounting::estimate() const {
   return bitsInBitmap * log(static_cast<double>(bitsInBitmap) / static_cast<double>(unsetBits));
 }
 
+/** 
+ * These values come from the Google paper appendix. Based on this array one can tell when
+ * LinearCounting ought to be applied. For instance, if precision is 10 (i.e. 10 bits are used 
+ * to choose the bucket), then array[10-4] = array[6] = 900. This means, that if the Bias-corrected
+ * cardinality is below 900, LinearCounting's estimate should be used instead of the HLL's one.
+ *
+ * See: https://docs.google.com/document/d/1gyjfMHy43U9OWBXxfaeG-3MjGzejW1dlpyMwEYAAWEI/
+ */
 
-// first item in this array is for precision=4
 const uint64_t LinearCounting::linearCountingThreshold[] =
   {10, 20, 40, 80, 220, 400, 900, 1800, 3100, 6500, 11500, 20000, 50000, 120000, 350000};
 
