@@ -15,10 +15,10 @@ set(VERTICA_INCLUDE ${SDK_HOME}/include)
 include_directories(${VERTICA_INCLUDE} include src)
 
 # Here we add all source files to appear in libhll.so
-set(SOURCES src/Hll.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp)
+set(SOURCES src/bias_corrected_estimate.cpp src/linear_counting.cpp src/Hll.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp)
 add_library(hll SHARED ${SOURCES})
 
-add_executable(hll_driver tests/hll_driver.cpp)
+add_executable(hll_driver tests/hll_driver.cpp src/bias_corrected_estimate.cpp src/linear_counting.cpp )
 
 # Below we define a variable BUILD_TESTS which can be toggled e.g. with ccmake
 # It says whether the tests should be built at all
@@ -34,7 +34,7 @@ if (BUILD_TESTS)
 
   # Linking to Hll.cpp. We can't link to libhll.so, because there would
   # be some symbols missing, e.g. Vertica::dummy()
-  add_executable(hll_test tests/hll_test.cpp)
+  add_executable(hll_test tests/hll_test.cpp src/bias_corrected_estimate.cpp src/linear_counting.cpp)
 
   # Standard linking to googletest stuff.
   target_link_libraries(hll_test gtest gtest_main)
