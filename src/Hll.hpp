@@ -84,7 +84,6 @@ private:
   LinearCounting linearCounting;
 
   uint32_t biasCorrectedThreshold;
-  uint32_t linearCountingThreshold;
 
   uint8_t bucketBits;
   uint8_t valueBits;
@@ -153,8 +152,7 @@ private:
     this -> valueBits = 64 - bucketBits;
     this -> numberOfBuckets = 1UL << bucketBits;
 
-    this -> linearCountingThreshold =
-      linearCounting.getLinearCountingThreshold(bucketBits);
+    // Google's paper suggests to set the threshold to this value 
     this -> biasCorrectedThreshold = numberOfBuckets*5;
 
     this -> bucketSize = 1;
@@ -213,7 +211,6 @@ public:
     valueMask(other.valueMask),
     linearCounting(other.linearCounting),
     biasCorrectedThreshold(other.biasCorrectedThreshold),
-    linearCountingThreshold(other.linearCountingThreshold),
     bucketBits(other.bucketBits),
     valueBits(other.valueBits),
     synopsis(new uint8_t[other.numberOfBuckets]) {
@@ -227,7 +224,6 @@ public:
     valueMask(other.valueMask),
     linearCounting(other.linearCounting),
     biasCorrectedThreshold(other.biasCorrectedThreshold),
-    linearCountingThreshold(other.linearCountingThreshold),
     bucketBits(other.bucketBits),
     valueBits(other.valueBits) {
       // we swap the values, so that we get the synopsis from the temporary

@@ -34,7 +34,7 @@ public:
   LinearCounting& operator=(LinearCounting&& other);
 
   void add(uint64_t hashValue);
-  uint64_t getLinearCountingThreshold(uint32_t precision) const;
+  static uint64_t getLinearCountingThreshold(uint8_t hllPrecision);
   uint64_t estimate() const;
 
 };
