@@ -90,7 +90,9 @@ private:
         break;
       case 6:
         alpha = 0.709;
-      // since 14 is our most common case, we make it computable in compile time
+      // since 11 and 14 are most likely cases, we make it computable in compile time
+      case 11:
+        alpha = (0.7213 / (1.0 + (1.079 / (1<<11)))); //0.72092
       case 14:
         alpha = (0.7213 / (1.0 + (1.079 / (1<<14)))); //0.721253
       default:
