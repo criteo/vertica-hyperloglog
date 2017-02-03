@@ -157,13 +157,6 @@ public:
     memset( synopsis, 0, numberOfBuckets );
   }
 
-  Hll(const uint8_t* synopsis, uint8_t bucketBits) :
-      linearCounting(LINEAR_COUNTING_BITS) {
-    init(bucketBits);
-    for(uint64_t i = 0; i < numberOfBuckets; i++) {
-      this -> synopsis[i] = synopsis[i];
-    }
-  }
 
   /** Copy constructor */
   Hll(const Hll& other) : numberOfBuckets(other.numberOfBuckets),
