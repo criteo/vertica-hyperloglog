@@ -10,6 +10,7 @@
 #define HLL_ARRAY_SIZE_DEFAULT_VALUE 4
 
 using namespace Vertica;
+using HLL = Hll<uint64_t>;
 
 const Format FORMAT = Format::SPARSE;
 
@@ -27,7 +28,7 @@ class HllCreateSynopsis : public AggregateFunction
         if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
             vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
         hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
-        Hll<uint64_t> initialHll(hllLeadingBits);
+        HLL initialHll(hllLeadingBits);
         this -> synopsisSize = initialHll.getSynopsisSize(FORMAT);
         initialHll.serialize(aggs.getStringRef(0).data(), FORMAT);
     }
@@ -36,7 +37,7 @@ class HllCreateSynopsis : public AggregateFunction
                    BlockReader &argReader,
                    IntermediateAggs &aggs)
     {
-      Hll<uint64_t> outputHll(hllLeadingBits);
+      HLL outputHll(hllLeadingBits);
       outputHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       do {
         const vint &currentValue = argReader.getIntRef(0);
@@ -49,10 +50,10 @@ class HllCreateSynopsis : public AggregateFunction
                          IntermediateAggs &aggs,
                          MultipleIntermediateAggs &aggsOther)
     {
-      Hll<uint64_t> outputHll(hllLeadingBits);
+      HLL outputHll(hllLeadingBits);
       outputHll.deserialize(aggs.getStringRef(0).data(), FORMAT );
       do {
-        Hll<uint64_t> currentSynopsis(hllLeadingBits);
+        HLL currentSynopsis(hllLeadingBits);
         currentSynopsis.deserialize(aggsOther.getStringRef(0).data(), FORMAT);
         outputHll.add(currentSynopsis);
       } while (aggsOther.next());
@@ -86,7 +87,7 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
                                       const SizedColumnTypes &inputTypes,
                                       SizedColumnTypes &intermediateTypeMetaData)
     {
-      Hll<uint64_t> dummy(readSubStreamBits(srvInterface));
+      HLL dummy(readSubStreamBits(srvInterface));
       intermediateTypeMetaData.addVarbinary(dummy.getSynopsisSize(FORMAT));
     }
 
@@ -103,7 +104,7 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
                                const SizedColumnTypes &inputTypes,
                                SizedColumnTypes &outputTypes)
     {
-      Hll<uint64_t> dummy(readSubStreamBits(srvInterface));
+      HLL dummy(readSubStreamBits(srvInterface));
       outputTypes.addVarbinary(dummy.getSynopsisSize(FORMAT));
     }
 

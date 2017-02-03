@@ -10,6 +10,7 @@
 #define HLL_ARRAY_SIZE_DEFAULT_VALUE 4
 
 using namespace Vertica;
+using HLL = Hll<uint64_t>;
 
 const Format FORMAT = Format::SPARSE;
 
@@ -27,7 +28,7 @@ class HllDistinctCount : public AggregateFunction
         if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
             vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
         hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
-        Hll<uint64_t> initialHll(hllLeadingBits);
+        HLL initialHll(hllLeadingBits);
         this -> synopsisSize = initialHll.getSynopsisSize(FORMAT);
         initialHll.serialize(aggs.getStringRef(0).data(), FORMAT);
     }
@@ -36,10 +37,10 @@ class HllDistinctCount : public AggregateFunction
                    BlockReader &argReader,
                    IntermediateAggs &aggs)
     {
-      Hll<uint64_t> outputHll(hllLeadingBits);
+      HLL outputHll(hllLeadingBits);
       outputHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       do {
-        Hll<uint64_t> currentSynopsis(hllLeadingBits);
+        HLL currentSynopsis(hllLeadingBits);
         currentSynopsis.deserialize(argReader.getStringRef(0).data(), FORMAT);
         outputHll.add(currentSynopsis);
       } while (argReader.next());
@@ -51,10 +52,10 @@ class HllDistinctCount : public AggregateFunction
                          IntermediateAggs &aggs,
                          MultipleIntermediateAggs &aggsOther)
     {
-      Hll<uint64_t> outputHll(hllLeadingBits);
+      HLL outputHll(hllLeadingBits);
       outputHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       do {
-        Hll<uint64_t> currentSynopsis(hllLeadingBits);
+        HLL currentSynopsis(hllLeadingBits);
         currentSynopsis.deserialize(aggsOther.getStringRef(0).data(), FORMAT);
         outputHll.add(currentSynopsis);
       } while (aggsOther.next());
@@ -65,7 +66,7 @@ class HllDistinctCount : public AggregateFunction
                            BlockWriter &resWriter,
                            IntermediateAggs &aggs)
     {
-      Hll<uint64_t> finalHll(hllLeadingBits);
+      HLL finalHll(hllLeadingBits);
       finalHll.deserialize(aggs.getStringRef(0).data(), FORMAT);
       resWriter.setInt(finalHll.approximateCountDistinct());
     }
@@ -89,7 +90,7 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
                                       const SizedColumnTypes &inputTypes,
                                       SizedColumnTypes &intermediateTypeMetaData)
     {
-      Hll<uint64_t> dummy(readSubStreamBits(srvInterface));
+      HLL dummy(readSubStreamBits(srvInterface));
       intermediateTypeMetaData.addVarbinary(dummy.getSynopsisSize(FORMAT));
     }
 
