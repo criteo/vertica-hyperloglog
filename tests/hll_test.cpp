@@ -7,22 +7,22 @@
 
 
 #include "gtest/gtest.h"
-#include "Hll.hpp"
+#include "hll_raw.hpp"
 
 using namespace std;
 
 namespace {
 
 
-class HllTest : public ::testing::Test {
+class HllRawTest : public ::testing::Test {
  protected:
   const std::string ids_filepath = "../data/ids.dat";
   std::ifstream data_file;
 
-  HllTest() : data_file{ids_filepath, std::ifstream::in} {
+  HllRawTest() : data_file{ids_filepath, std::ifstream::in} {
   }
 
-  virtual ~HllTest() {
+  virtual ~HllRawTest() {
     // You can do clean-up work that doesn't throw exceptions here.
   }
 
@@ -63,13 +63,13 @@ public:
 
 /**
  * This test checks serialization and deserialization in the dense format, i.e.
- * where 4 buckets are compressed to 3 bytes. An instance of Hll is serialized 
- * and then another instance of Hll is created and used as a target for
- * deserialization. The expected result is that both Hlls give the same
+ * where 4 buckets are compressed to 3 bytes. An instance of HllRaw is serialized 
+ * and then another instance of HllRaw is created and used as a target for
+ * deserialization. The expected result is that both HllRaws give the same
  * estimation and are bitwise equal.
  */
-TEST_F(HllTest, TestSerializeDeserializeDense) {
-  Hll<uint64_t> hll(14);
+TEST_F(HllRawTest, TestSerializeDeserializeDense) {
+  HllRaw<uint64_t> hll(14);
 
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
@@ -77,7 +77,7 @@ TEST_F(HllTest, TestSerializeDeserializeDense) {
   uint32_t length = hll.getSynopsisSize(Format::DENSE);
 
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize(byte_array.get(), Format::DENSE);
+  hll.serializeDense(byte_array.get());
   /**
    * Maybe we modify this as the codebase matures, but for the time being
    * we expect his fixed length
@@ -86,10 +86,10 @@ TEST_F(HllTest, TestSerializeDeserializeDense) {
   const uint32_t ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED = 12288U;
   EXPECT_EQ(length, ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED);
 
-  Hll<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserialize(byte_array.get(), Format::DENSE);
+  HllRaw<uint64_t> deserialized_hll(14);
+  deserialized_hll.deserializeDense(byte_array.get());
 
-  EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+  EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
 }
 
@@ -97,8 +97,8 @@ TEST_F(HllTest, TestSerializeDeserializeDense) {
  * This test shares the logic with TestSerializeDeserializeDense.
  * However, it saves the data in a file and then reads it back in. 
  */
-TEST_F(HllTest, TestSerializeDeserializeDenseToFile) {
-  Hll<uint64_t> hll(14);
+TEST_F(HllRawTest, TestSerializeDeserializeDenseToFile) {
+  HllRaw<uint64_t> hll(14);
 
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
@@ -107,7 +107,7 @@ TEST_F(HllTest, TestSerializeDeserializeDenseToFile) {
   uint32_t length = hll.getSynopsisSize(Format::DENSE);
 
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize(byte_array.get(), Format::DENSE);
+  hll.serializeDense(byte_array.get());
   std::ofstream temp_file_out("tmp", std::ios::binary | std::ios::out);
   temp_file_out.write(byte_array.get(), length);
   temp_file_out.close();
@@ -119,10 +119,10 @@ TEST_F(HllTest, TestSerializeDeserializeDenseToFile) {
   unlink("tmp");
 
 
-  Hll<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserialize(byte_array2.get(), Format::DENSE);
+  HllRaw<uint64_t> deserialized_hll(14);
+  deserialized_hll.deserializeDense(byte_array2.get());
 
-  EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+  EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
 }
 
@@ -133,26 +133,26 @@ TEST_F(HllTest, TestSerializeDeserializeDenseToFile) {
  * std::hash can't be used here, since in many implementations it's
  * not random or broken.
  */
-TEST_F(HllTest, TestKnuthHash) {
-  Hll<uint32_t, KnuthHash> hll(4);
+TEST_F(HllRawTest, TestKnuthHash) {
+  HllRaw<uint32_t, KnuthHash> hll(4);
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
 
   const uint32_t realCardinality = 632055;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.02*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.98*realCardinality);
+  EXPECT_LT(hll.estimate(), 1.02*realCardinality);
+  EXPECT_GT(hll.estimate(), 0.98*realCardinality);
 }
 
 
-TEST_F(HllTest, TestErrorWithinRangeForDifferentBucketMasks) {
+TEST_F(HllRawTest, TestErrorWithinRangeForDifferentBucketMasks) {
   /**
    * We create a bunch of different HLL synopsis with bucket masks spreading
    * from 8 to 16. We store them together with the precision parameter
    * in order to be able to estimate the relative error later on.
    */
-  std::vector<std::pair<uint8_t, Hll<uint64_t>>> hlls = { {6, {6}},
+  std::vector<std::pair<uint8_t, HllRaw<uint64_t>>> hlls = { {6, {6}},
       {8,  {8} },
       {10, {10}},
       {12, {12}},
@@ -176,9 +176,9 @@ TEST_F(HllTest, TestErrorWithinRangeForDifferentBucketMasks) {
 
   for(auto& bits_hll: hlls) {
     uint8_t basket_bits = bits_hll.first;
-    Hll<uint64_t> hll = bits_hll.second;
+    HllRaw<uint64_t> hll = bits_hll.second;
     
-    int64_t approximated_cardinality = static_cast<uint64_t>(hll.approximateCountDistinct());
+    int64_t approximated_cardinality = static_cast<uint64_t>(hll.estimate());
 
     uint32_t m = 2 << basket_bits;
     /**
@@ -195,17 +195,17 @@ TEST_F(HllTest, TestErrorWithinRangeForDifferentBucketMasks) {
 
 /**
  * This test uses a non-standard hash function which yields 0x1 for every input
- * value. For such a hash function Hll should always return the same estimate,
+ * value. For such a hash function HllRaw should always return the same estimate,
  * no matter how many elements will be added.
  */
-TEST_F(HllTest, TestDummyHashFunction) {
-  Hll<uint64_t, DummyHash> hll(14);
+TEST_F(HllRawTest, TestDummyHashFunction) {
+  HllRaw<uint64_t, DummyHash> hll(14);
   hll.add(static_cast<uint64_t>(0));
-  auto singleElementDummyCount = hll.approximateCountDistinct();
+  auto singleElementDummyCount = hll.estimate();
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
-  auto millionElementsDummyCount = hll.approximateCountDistinct();
+  auto millionElementsDummyCount = hll.estimate();
   ASSERT_EQ(singleElementDummyCount, millionElementsDummyCount);
 }
 
@@ -214,9 +214,9 @@ TEST_F(HllTest, TestDummyHashFunction) {
  * This test whether the serialized synopses have expected lengths
  * NOTE: Length of a synopsis depends on the used precision and chosen format.
  */
-TEST_F(HllTest, TestNonStandardSynopsisSize) {
+TEST_F(HllRawTest, TestNonStandardSynopsisSize) {
   for(uint8_t precision=4; precision<=18; ++precision) {
-    Hll<uint64_t> hll(precision);
+    HllRaw<uint64_t> hll(precision);
     ASSERT_EQ(hll.getSynopsisSize(Format::SPARSE), 1<<precision);
     // dense format is expected to go down by 3/4
     // since 8 bits become 6
@@ -227,13 +227,13 @@ TEST_F(HllTest, TestNonStandardSynopsisSize) {
 
 /**
  * This tests splits the input data set into two halves. The first half is added
- * to one Hll, the second half to another Hll. At the same time all the elements
- * are added to a third Hll. Assumption is that if we add to halfs of the input
+ * to one HllRaw, the second half to another HllRaw. At the same time all the elements
+ * are added to a third HllRaw. Assumption is that if we add to halfs of the input
  * data, we should get the same estimate as for having all the elements stored in
- * one Hll.
+ * one HllRaw.
  */
-TEST_F(HllTest, TestSynopsisAdditionAssociativity) {
-  Hll<uint64_t> hll1(14), hll2(14), hll1plus2(14);
+TEST_F(HllRawTest, TestSynopsisAdditionAssociativity) {
+  HllRaw<uint64_t> hll1(14), hll2(14), hll1plus2(14);
   std::vector<uint32_t> ids;
   ids.reserve(1000000); 
   for(uint32_t id; data_file >> id;) {
@@ -250,7 +250,7 @@ TEST_F(HllTest, TestSynopsisAdditionAssociativity) {
   }
 
   hll1.add(hll2);
-  ASSERT_EQ(hll1.approximateCountDistinct(), hll1plus2.approximateCountDistinct());
+  ASSERT_EQ(hll1.estimate(), hll1plus2.estimate());
 }
 
 
@@ -258,25 +258,25 @@ TEST_F(HllTest, TestSynopsisAdditionAssociativity) {
  * This test uses a hash function accepting 32 bit values. The target values are
  * 64 bits long, but this should work as well. 
  */
-TEST_F(HllTest, Test32BitHash) {
-  Hll<uint32_t> hll(14);
+TEST_F(HllRawTest, Test32BitHash) {
+  HllRaw<uint32_t> hll(14);
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
   const uint32_t realCardinality = 632055;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
+  EXPECT_LT(hll.estimate(), 1.01*realCardinality);
+  EXPECT_GT(hll.estimate(), 0.99*realCardinality);
 }
 
 
-TEST_F(HllTest, Test32BitIds) {
-  Hll<uint32_t> hll(14);
+TEST_F(HllRawTest, Test32BitIds) {
+  HllRaw<uint32_t> hll(14);
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
   const uint32_t realCardinality = 632055;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
+  EXPECT_LT(hll.estimate(), 1.01*realCardinality);
+  EXPECT_GT(hll.estimate(), 0.99*realCardinality);
 }
 
 
@@ -285,8 +285,8 @@ TEST_F(HllTest, Test32BitIds) {
  * growing monotonically, adding new elements should never make the estimate
  * lower.
  */
-TEST_F(HllTest, TestEstimateGrowsMonotonically) {
-  Hll<uint64_t> hll(14);
+TEST_F(HllRawTest, TestEstimateGrowsMonotonically) {
+  HllRaw<uint64_t> hll(14);
 
   uint32_t counter = 0;
   uint64_t prevEstimate = 0;
@@ -294,7 +294,7 @@ TEST_F(HllTest, TestEstimateGrowsMonotonically) {
     hll.add(id);
     ++counter;
     if(counter % 100000 == 0) { // check how the estimate behaves every 100k elements
-      uint64_t curEstimate = hll.approximateCountDistinct();
+      uint64_t curEstimate = hll.estimate();
       EXPECT_GE(curEstimate, prevEstimate);
       prevEstimate = curEstimate;
     }
@@ -309,14 +309,14 @@ TEST_F(HllTest, TestEstimateGrowsMonotonically) {
  * either contains the same value or a larger one. If it's larger, adding
  * already seen value will not change it.
  */
-TEST_F(HllTest, TestAlreadySeenItemsDontChangeEstimate) {
-  Hll<uint64_t> hll(14);
+TEST_F(HllRawTest, TestAlreadySeenItemsDontChangeEstimate) {
+  HllRaw<uint64_t> hll(14);
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
 
-  auto firstEstimate = hll.approximateCountDistinct();
+  auto firstEstimate = hll.estimate();
 
   data_file.seekg(0); // go back to the beginning
   data_file.ignore(256, '\n');
@@ -325,7 +325,7 @@ TEST_F(HllTest, TestAlreadySeenItemsDontChangeEstimate) {
     hll.add(id);
   }
 
-  EXPECT_EQ(firstEstimate, hll.approximateCountDistinct());
+  EXPECT_EQ(firstEstimate, hll.estimate());
 }
 
 
@@ -333,21 +333,21 @@ TEST_F(HllTest, TestAlreadySeenItemsDontChangeEstimate) {
  * Test whether an estimate for 1M numbers with cardinality=630k will fall
  * within 1% from the real value.
  */
-TEST_F(HllTest, TestBigInput) {
-  Hll<uint64_t> hll(14);
+TEST_F(HllRawTest, TestBigInput) {
+  HllRaw<uint64_t> hll(14);
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
 
   const uint32_t realCardinality = 632055;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
+  EXPECT_LT(hll.estimate(), 1.01*realCardinality);
+  EXPECT_GT(hll.estimate(), 0.99*realCardinality);
 }
 
 
-TEST_F(HllTest, TestSmallInput) {
-  Hll<uint64_t> hll(14);
+TEST_F(HllRawTest, TestSmallInput) {
+  HllRaw<uint64_t> hll(14);
 
   size_t i=0;
   for(uint32_t id; data_file >> id && i < 100000; ++i) {
@@ -355,8 +355,8 @@ TEST_F(HllTest, TestSmallInput) {
   }
 
   const uint32_t realCardinality = 95245;
-  EXPECT_LT(hll.approximateCountDistinct(), 1.01*realCardinality);
-  EXPECT_GT(hll.approximateCountDistinct(), 0.99*realCardinality);
+  EXPECT_LT(hll.estimate(), 1.01*realCardinality);
+  EXPECT_GT(hll.estimate(), 0.99*realCardinality);
 }
 
 }  // namespace

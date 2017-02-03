@@ -3,7 +3,7 @@
 #include <string>
 #include "gtest/gtest.h"
 #include "linear_counting.hpp"
-#include "Hll.hpp"
+#include "hll.hpp"
 
 using namespace std;
 
@@ -45,12 +45,12 @@ TEST_F(LinearCountingTest, TestLinearCounting) {
     // e.g. if HLL uses 10 bits of precision (2**10 buckets), LC will
     // have 2**5 bits, i.e. 2**3 = 8 bytes 
     LinearCounting lc(precision-5);
-    Hll<uint64_t> hll(precision); 
+    HllRaw<uint64_t> hll(precision); 
 
     MurMurHash<uint64_t> hash;
 
     const uint64_t lcThreshold = lc.getLinearCountingThreshold(precision);
-    const uint32_t realCardinality = lcThreshold / 10 ; // we go 25% below the threshold
+    const uint32_t realCardinality = lcThreshold / 10 ;
 
     generateNumbers(ids, realCardinality);
     assert(ids.size() == realCardinality);
@@ -61,7 +61,7 @@ TEST_F(LinearCountingTest, TestLinearCounting) {
     }
 
     uint64_t lcEstimate = lc.estimate();
-    uint64_t hllEstimate = hll.approximateCountDistinct();
+    uint64_t hllEstimate = hll.estimate();
     uint64_t bcEstimate = BiasCorrectedEstimate::estimate(hllEstimate, precision);
     // /cout << precision << " " << realCardinality << " " << lcEstimate << " " << bcEstimate << endl;
     uint32_t lcError = abs(static_cast<int32_t>(lcEstimate)-static_cast<int32_t>(realCardinality));

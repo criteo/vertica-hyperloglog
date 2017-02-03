@@ -6,7 +6,7 @@
 #include <vector>
 #include "gtest/gtest.h"
 #include "bias_corrected_estimate.hpp"
-#include "Hll.hpp"
+#include "hll.hpp"
 
 using namespace std;
 
@@ -54,7 +54,7 @@ TEST_F(BiasCorrectionTest, TestBiasCorrectionGivesBetterEstimateThanRawHLL) {
   for(uint8_t precision = MIN_SUPPORTED_PRECISION;
               precision <= MAX_SUPPORTED_PRECISION;
               ++precision) {
-    Hll<uint64_t> hll(precision);
+    HllRaw<uint64_t> hll(precision);
     std::set<uint64_t> ids;
     uint32_t biasCorrectionThreshold = 5 * (1 << precision);
 
@@ -68,7 +68,7 @@ TEST_F(BiasCorrectionTest, TestBiasCorrectionGivesBetterEstimateThanRawHLL) {
       uint32_t realCardinality = biasCorrectionThreshold*frac;
       generateNumbers(ids, realCardinality);
 
-      int32_t hllCardinality = static_cast<int32_t>(hll.approximateCountDistinct());
+      int32_t hllCardinality = static_cast<int32_t>(hll.estimate());
       int32_t biasCorrectedCardinality =
         static_cast<int32_t>(BiasCorrectedEstimate::estimate(hllCardinality, precision));
 
@@ -90,7 +90,7 @@ TEST_F(BiasCorrectionTest, TestBiasCorrectionGivesBetterEstimateThanRawHLL) {
  */
 TEST_F(BiasCorrectionTest, TestFixedPrecisionEstimate) {
   const uint8_t PRECISION = 14;
-  Hll<uint64_t> hll(PRECISION);
+  HllRaw<uint64_t> hll(PRECISION);
   std::vector<uint64_t> ids;
   std::set<uint64_t> idsSet;
 
@@ -107,7 +107,7 @@ TEST_F(BiasCorrectionTest, TestFixedPrecisionEstimate) {
     // we need this weird casting because those values will be subtracted
     // later on
     int32_t realCardinality = static_cast<int32_t>(idsSet.size());
-    int32_t hllEstimate = static_cast<int32_t>(hll.approximateCountDistinct());
+    int32_t hllEstimate = static_cast<int32_t>(hll.estimate());
     int32_t correctedEstimate = static_cast<int32_t>(BiasCorrectedEstimate::estimate(hllEstimate, PRECISION));
 
     auto hllError = abs(realCardinality - hllEstimate);

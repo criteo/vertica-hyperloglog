@@ -4,7 +4,7 @@
 #include <iostream>
 
 #include "Vertica.h"
-#include "Hll.hpp"
+#include "hll.hpp"
 
 #define HLL_ARRAY_SIZE_PARAMETER_NAME "hllLeadingBits"
 #define HLL_ARRAY_SIZE_DEFAULT_VALUE 4

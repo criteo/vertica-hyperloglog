@@ -3,7 +3,7 @@
 #include <sstream>
 #include <iostream>
 
-#include "Hll.hpp"
+#include "hll.hpp"
 #include "Vertica.h"
 
 #define HLL_ARRAY_SIZE_PARAMETER_NAME "hllLeadingBits"

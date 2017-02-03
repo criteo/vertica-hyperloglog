@@ -11,10 +11,8 @@
 #include "murmur_hash.hpp"
 
 
-const uint8_t LINEAR_COUNTING_BITS = 10;
-
-#ifndef _HLL_H_
-#define _HLL_H_
+#ifndef _HLL_RAW_H_
+#define _HLL_RAW_H_
 
 enum class Format {SPARSE, DENSE};
 
@@ -23,7 +21,7 @@ enum class Format {SPARSE, DENSE};
  * H is a class deriving from Hash<T>
  */
 template<typename T, typename H = MurMurHash<T> >
-class Hll {
+class HllRaw {
 /**
  * The line below is the fanciest thing I've ever done.
  * This enforces in compile time that the H parameter is a subclass of Hash<T>.
@@ -42,10 +40,6 @@ private:
   uint64_t bucketMask;
   uint64_t valueMask;
 
-  LinearCounting linearCounting;
-
-  uint32_t biasCorrectedThreshold;
-
   uint8_t bucketBits;
   uint8_t valueBits;
   uint8_t* synopsis;
@@ -63,51 +57,6 @@ private:
       return (uint8_t)__builtin_clzll(hash & valueMask) + 1 - bucketBits;
   }
 
-  /**
-   * This function is a direct implementation of the formula presented in
-   * Flajolet's paper. According to it the cardinality estimation is calculated
-   * as follows:
-   *
-   * E = \alpha_m * m^2 * sum_{j=1}^m{2^{-M[j]}}
-   *
-   * where:
-   *    E is the estimation
-   *    \alpha_m is a constant derived from another formula
-   *    m is number of buckets
-   *    M[j] is count from the j-th bucket
-   *
-   */
-  uint64_t hllEstimate() const {
-    double harmonicMean = 0.0;
-    double alpha;
-    // Alpha computation (see paper)
-    switch (bucketBits) {
-      case 4:
-        alpha = 0.673;
-        break;
-      case 5:
-        alpha = 0.697;
-        break;
-      case 6:
-        alpha = 0.709;
-      // since 11 and 14 are most likely cases, we make it computable in compile time
-      case 11:
-        alpha = (0.7213 / (1.0 + (1.079 / (1<<11)))); //0.72092
-      case 14:
-        alpha = (0.7213 / (1.0 + (1.079 / (1<<14)))); //0.721253
-      default:
-        alpha = (0.7213 / (1.0 + (1.079 / static_cast<double>(numberOfBuckets))));
-    }
-    for (uint64_t i = 0; i < numberOfBuckets; i++)
-    {
-        harmonicMean += 1.0 / (1 << (synopsis[i]));
-    }
-    harmonicMean = numberOfBuckets / harmonicMean;
-    // std::llround returns a long long
-    // note: other rounding functions return a floating point or shorter types
-    uint64_t hllEstimate = std::llround(0.5 + alpha * harmonicMean * numberOfBuckets);
-    return hllEstimate;
-  }
 
 
   void init(uint8_t bucketBits) {
@@ -115,8 +64,6 @@ private:
     this -> valueBits = 64 - bucketBits;
     this -> numberOfBuckets = 1UL << bucketBits;
 
-    // Google's paper suggests to set the threshold to this value 
-    this -> biasCorrectedThreshold = numberOfBuckets*5;
 
     // Ex: with a 4 bits bucket on a 2 bytes size_t we want 1111 0000 0000 0000
     // So that's 10000 minus 1 shifted with 12 zeroes 1111 0000 0000 0000
@@ -151,7 +98,7 @@ public:
    *
    * See: https://en.wikipedia.org/wiki/Rule_of_three_(C%2B%2B_programming)
    */
-  Hll(uint8_t bucketBits) : linearCounting(LINEAR_COUNTING_BITS) {
+  HllRaw(uint8_t bucketBits) { 
     init(bucketBits);
     //TODO: This will not work when buckets won't be a single byte
     memset( synopsis, 0, numberOfBuckets );
@@ -159,11 +106,9 @@ public:
 
 
   /** Copy constructor */
-  Hll(const Hll& other) : numberOfBuckets(other.numberOfBuckets),
+  HllRaw(const HllRaw& other) : numberOfBuckets(other.numberOfBuckets),
     bucketMask(other.bucketMask),
     valueMask(other.valueMask),
-    linearCounting(other.linearCounting),
-    biasCorrectedThreshold(other.biasCorrectedThreshold),
     bucketBits(other.bucketBits),
     valueBits(other.valueBits),
     synopsis(new uint8_t[other.numberOfBuckets]) {
@@ -171,11 +116,9 @@ public:
   }
 
   /** Move constructor */
-  Hll(Hll&& other) noexcept : numberOfBuckets(other.numberOfBuckets),
+  HllRaw(HllRaw&& other) noexcept : numberOfBuckets(other.numberOfBuckets),
     bucketMask(other.bucketMask),
     valueMask(other.valueMask),
-    linearCounting(other.linearCounting),
-    biasCorrectedThreshold(other.biasCorrectedThreshold),
     bucketBits(other.bucketBits),
     valueBits(other.valueBits) {
       // we swap the values, so that we get the synopsis from the temporary
@@ -185,21 +128,21 @@ public:
     }
 
   /** Copy assignment operator */
-  Hll& operator=(const Hll& other) {
-    Hll tmp(other);
+  HllRaw& operator=(const HllRaw& other) {
+    HllRaw tmp(other);
     *this = std::move(tmp);
     return *this;
   }
 
   /** Move assignment operator */
-  Hll& operator=(Hll&& other) noexcept {
+  HllRaw& operator=(HllRaw&& other) noexcept {
     delete[] synopsis;
     synopsis = other.synopsis;
     other.synopsis = nullptr;
     return *this;
   }
 
-  ~Hll() {
+  ~HllRaw() {
     delete[] synopsis;
   }
 
@@ -208,8 +151,6 @@ public:
     uint64_t hashValue = hashFunction(value);
     // We store in the synopsis for the the biggest leftmost one
     synopsis[bucket(hashValue)] = std::max(synopsis[bucket(hashValue)], leftMostSetBit(hashValue));
-    linearCounting.add(hashValue);
-
   }
 
   void add(const uint8_t otherSynopsis[]) {
@@ -218,9 +159,13 @@ public:
     }
   }
 
-  void add(const Hll<T>& other) {
+  void add(const HllRaw<T>& other) {
     assert(this->numberOfBuckets == other.numberOfBuckets);
     this->add(other.synopsis); 
+  }
+
+  uint8_t getBucketBits() const {
+    return bucketBits;
   }
 
   uint8_t* getCurrentSynopsis() {
@@ -231,66 +176,80 @@ public:
     return this -> numberOfBuckets;
   }
 
-/**
- * Hll's error becomes significant for small cardinalities. For instance, when
- * the cardinality is 0, HLL(p=14) estimates it to ~11k.
- * To circumvent 
- */
-  uint64_t approximateCountDistinct() {
-    return hllEstimate();
-    // uint64_t hllEstimate = this->hllEstimate();
-    // uint64_t linearCountingEstimate = this->linearCounting->estimate();
+  uint32_t getSynopsisSize(Format format) {
+    if(format == Format::SPARSE) {
+      return numberOfBuckets;
 
-    // if(hllEstimate < biasCorrectedThreshold) {
-    //     if(linearCountingEstimate < linearCountingThreshold) {
-    //       return this->linearCounting->estimate();
-    //     } else {
-    //       return BiasCorrectedEstimate::estimate(hllEstimate, bucketBits);
-    //     }
-    // } else {
-    //   return hllEstimate;
-    // }
+    } else if(format == Format::DENSE) {
+      uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
+      uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
+      uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
+      return outputArraySize;
+    } else {
+      //TODO: replace it with an exception or sth more meaningful
+      assert(0);
+    }
   }
 
-void deserialize(const char* byteArray, Format format) {
-  if(format == Format::SPARSE) {
+  /**
+   * This function is a direct implementation of the formula presented in
+   * Flajolet's paper. According to it the cardinality estimation is calculated
+   * as follows:
+   *
+   * E = \alpha_m * m^2 * sum_{j=1}^m{2^{-M[j]}}
+   *
+   * where:
+   *    E is the estimation
+   *    \alpha_m is a constant derived from another formula
+   *    m is number of buckets
+   *    M[j] is count from the j-th bucket
+   *
+   */
+  uint64_t estimate() const {
+    double harmonicMean = 0.0;
+    double alpha;
+    // Alpha computation (see paper)
+    switch (bucketBits) {
+      case 4:
+        alpha = 0.673;
+        break;
+      case 5:
+        alpha = 0.697;
+        break;
+      case 6:
+        alpha = 0.709;
+      // since 11 and 14 are most likely cases, we make it computable in compile time
+      case 11:
+        alpha = (0.7213 / (1.0 + (1.079 / (1<<11)))); //0.72092
+      case 14:
+        alpha = (0.7213 / (1.0 + (1.079 / (1<<14)))); //0.721253
+      default:
+        alpha = (0.7213 / (1.0 + (1.079 / static_cast<double>(numberOfBuckets))));
+    }
+    for (uint64_t i = 0; i < numberOfBuckets; i++)
+    {
+        harmonicMean += 1.0 / (1 << (synopsis[i]));
+    }
+    harmonicMean = numberOfBuckets / harmonicMean;
+    // std::llround returns a long long
+    // note: other rounding functions return a floating point or shorter types
+    uint64_t hllEstimate = std::llround(0.5 + alpha * harmonicMean * numberOfBuckets);
+    return hllEstimate;
+  }
+
+  void deserializeSparse(const char* byteArray1) {
+    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
     for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
       synopsis[i] = byteArray[i];
     }
-  } else if (format == Format::DENSE) {
-    deserializeDense(byteArray);
   }
-}
 
-
-void serialize(char* byteArray, Format format) const {
-  if(format == Format::SPARSE) {
+  void serializeSparse(char* byteArray1) const {
+    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
     for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
       byteArray[i] = synopsis[i];
     }
-  } else if (format == Format::DENSE) {
-    serializeDense(byteArray);
-  } else {
-    //TODO: replace it with an exception or sth more meaningful
-    assert(0);
   }
-}
-
-uint32_t getSynopsisSize(Format format) {
-  if(format == Format::SPARSE) {
-    return numberOfBuckets;
-
-  } else if(format == Format::DENSE) {
-    uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
-    uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
-    uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
-    return outputArraySize;
-  } else {
-    //TODO: replace it with an exception or sth more meaningful
-    assert(0);
-  }
-}
-
 /**
  * We use dense representation for storing the buckets.
  * In the Hll class we store the synopsis as an array of 2^14 bytes. In fact,
