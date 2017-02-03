@@ -118,8 +118,6 @@ private:
     // Google's paper suggests to set the threshold to this value 
     this -> biasCorrectedThreshold = numberOfBuckets*5;
 
-    this -> bucketSize = 1;
-
     // Ex: with a 4 bits bucket on a 2 bytes size_t we want 1111 0000 0000 0000
     // So that's 10000 minus 1 shifted with 12 zeroes 1111 0000 0000 0000
     this -> bucketMask = (( 1UL << bucketBits ) - 1UL) << valueBits;
@@ -169,7 +167,6 @@ public:
 
   /** Copy constructor */
   Hll(const Hll& other) : numberOfBuckets(other.numberOfBuckets),
-    bucketSize(other.bucketSize),
     bucketMask(other.bucketMask),
     valueMask(other.valueMask),
     linearCounting(other.linearCounting),
@@ -182,7 +179,6 @@ public:
 
   /** Move constructor */
   Hll(Hll&& other) noexcept : numberOfBuckets(other.numberOfBuckets),
-    bucketSize(other.bucketSize),
     bucketMask(other.bucketMask),
     valueMask(other.valueMask),
     linearCounting(other.linearCounting),
@@ -289,7 +285,7 @@ void serialize(char* byteArray, Format format) const {
 
 uint32_t getSynopsisSize(Format format) {
   if(format == Format::SPARSE) {
-    return numberOfBuckets * bucketSize;
+    return numberOfBuckets;
 
   } else if(format == Format::DENSE) {
     uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
