@@ -149,8 +149,10 @@ public:
   void add(T value) {
     H hashFunction;
     uint64_t hashValue = hashFunction(value);
+
+    const uint32_t dstBucket = bucket(hashValue);
     // We store in the synopsis for the the biggest leftmost one
-    synopsis[bucket(hashValue)] = std::max(synopsis[bucket(hashValue)], leftMostSetBit(hashValue));
+    synopsis[dstBucket] = std::max(synopsis[dstBucket], leftMostSetBit(hashValue));
   }
 
   void add(const uint8_t otherSynopsis[]) {
@@ -189,6 +191,14 @@ public:
       //TODO: replace it with an exception or sth more meaningful
       assert(0);
     }
+  }
+
+  uint32_t emptyBucketsCount() const {
+    uint32_t emptyBuckets = 0;
+    for (uint64_t i = 0; i < numberOfBuckets; i++) {
+      emptyBuckets += static_cast<uint32_t>(synopsis[i] == 0);
+    }
+    return emptyBuckets;
   }
 
   /**

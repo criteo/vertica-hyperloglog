@@ -65,19 +65,28 @@ public:
  * To circumvent 
  */
   uint64_t approximateCountDistinct() {
-    return hll.estimate();
-  //   uint64_t hllEstimate = this->hll.estimate();
-  //   uint64_t lcEstimate = this->linearCounting.estimate();
+    uint64_t e = this->hll.estimate();
+    uint64_t ee;
 
-  //   if(hllEstimate < biasCorrectedThreshold) {
-  //       if(lcEstimate < lcThreshold) {
-  //         return lcEstimate;
-  //       } else {
-  //         return BiasCorrectedEstimate::estimate(hllEstimate, bucketBits);
-  //       }
-  //   } else {
-  //     return hllEstimate;
-  //   }
+    if(e <= biasCorrectedThreshold) {
+      ee = BiasCorrectedEstimate::estimate(e, hll.getBucketBits());
+    } else {
+      ee = e;
+    }
+
+    uint64_t h;
+    if(this->hll.emptyBucketsCount() != 0) {
+      double v = static_cast<double>(hll.getNumberOfBuckets())/static_cast<double>(hll.emptyBucketsCount());
+      h = hll.getNumberOfBuckets() * log(v);
+    } else {
+      h = ee;
+    }
+
+    if(h <= lcThreshold) {
+      return h;
+    } else {
+      return ee;
+    }
   }
 
 };
