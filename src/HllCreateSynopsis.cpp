@@ -12,7 +12,7 @@
 using namespace Vertica;
 using HLL = Hll<uint64_t>;
 
-const Format FORMAT = Format::SPARSE;
+const Format FORMAT = Format::NORMAL;
 
 class HllCreateSynopsis : public AggregateFunction
 {

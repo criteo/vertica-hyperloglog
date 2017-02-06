@@ -24,9 +24,9 @@ public:
   Hll(uint8_t bucketBits) : Hll(bucketBits, bucketBits-4) {}
 
   void deserialize(const char* byteArray, Format format) {
-    if(format == Format::SPARSE) {
+    if(format == Format::NORMAL) {
       hll.deserializeSparse(byteArray);
-    } else if (format == Format::DENSE) {
+    } else if (format == Format::COMPACT) {
       hll.deserializeDense(byteArray);
     } else {
       assert(0);
@@ -34,9 +34,9 @@ public:
   }
 
   void serialize(char* byteArray, Format format) const {
-    if(format == Format::SPARSE) {
+    if(format == Format::NORMAL) {
       hll.serializeSparse(byteArray);
-    } else if (format == Format::DENSE) {
+    } else if (format == Format::COMPACT) {
       hll.serializeDense(byteArray);
     } else {
       //TODO: replace it with an exception or sth more meaningful

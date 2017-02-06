@@ -21,12 +21,12 @@ int main(int argc, char** argv) {
 
   // depending on the precision and format chosen, the output vector (aka synopsis)
   // will have different size
-  auto synopsisSize = hll.getSynopsisSize(Format::SPARSE);
+  auto synopsisSize = hll.getSynopsisSize(Format::NORMAL);
   char outputArray[synopsisSize];
 
   // It's the users responsability to use a
   // buffer with sufficient space.
   // the serialization method is guaranteed not to write out of bounds
-  hll.serialize(outputArray, Format::SPARSE);
+  hll.serialize(outputArray, Format::NORMAL);
 
 }

@@ -14,7 +14,7 @@
 #ifndef _HLL_RAW_H_
 #define _HLL_RAW_H_
 
-enum class Format {SPARSE, DENSE};
+enum class Format {NORMAL, COMPACT};
 
 /**
  * T is the hashable type. The class can be used to count various types.
@@ -179,10 +179,10 @@ public:
   }
 
   uint32_t getSynopsisSize(Format format) {
-    if(format == Format::SPARSE) {
+    if(format == Format::NORMAL) {
       return numberOfBuckets;
 
-    } else if(format == Format::DENSE) {
+    } else if(format == Format::COMPACT) {
       uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
       uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
       uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
