@@ -62,22 +62,22 @@ public:
 
 
 /**
- * This test checks serialization and deserialization in the dense format, i.e.
+ * This test checks serialization and deserialization in the 6-bits format, i.e.
  * where 4 buckets are compressed to 3 bytes. An instance of HllRaw is serialized 
  * and then another instance of HllRaw is created and used as a target for
  * deserialization. The expected result is that both HllRaws give the same
  * estimation and are bitwise equal.
  */
-TEST_F(HllRawTest, TestSerializeDeserializeDense) {
+TEST_F(HllRawTest, TestSerializeDeserialize6Bits) {
   HllRaw<uint64_t> hll(14);
 
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT);
+  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
 
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serializeDense(byte_array.get());
+  hll.serialize6Bits(byte_array.get());
   /**
    * Maybe we modify this as the codebase matures, but for the time being
    * we expect his fixed length
@@ -87,26 +87,26 @@ TEST_F(HllRawTest, TestSerializeDeserializeDense) {
   EXPECT_EQ(length, ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED);
 
   HllRaw<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserializeDense(byte_array.get());
+  deserialized_hll.deserialize6Bits(byte_array.get());
 
   EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
 }
 
 /**
- * This test shares the logic with TestSerializeDeserializeDense.
+ * This test shares the logic with the one above.
  * However, it saves the data in a file and then reads it back in. 
  */
-TEST_F(HllRawTest, TestSerializeDeserializeDenseToFile) {
+TEST_F(HllRawTest, TestSerializeDeserialize6BitsToFile) {
   HllRaw<uint64_t> hll(14);
 
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
 
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT);
+  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serializeDense(byte_array.get());
+  hll.serialize6Bits(byte_array.get());
   std::ofstream temp_file_out("tmp", std::ios::binary | std::ios::out);
   temp_file_out.write(byte_array.get(), length);
   temp_file_out.close();
@@ -119,7 +119,7 @@ TEST_F(HllRawTest, TestSerializeDeserializeDenseToFile) {
 
 
   HllRaw<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserializeDense(byte_array2.get());
+  deserialized_hll.deserialize6Bits(byte_array2.get());
 
   EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
@@ -217,9 +217,9 @@ TEST_F(HllRawTest, TestNonStandardSynopsisSize) {
   for(uint8_t precision=4; precision<=18; ++precision) {
     HllRaw<uint64_t> hll(precision);
     ASSERT_EQ(hll.getSynopsisSize(Format::NORMAL), 1<<precision);
-    // dense format is expected to go down by 3/4
+    // 6 bit format is expected to go down by 3/4
     // since 8 bits become 6
-    ASSERT_EQ(hll.getSynopsisSize(Format::COMPACT), (1<<precision)*3/4);
+    ASSERT_EQ(hll.getSynopsisSize(Format::COMPACT_6BITS), (1<<precision)*3/4);
   }
 }
 

@@ -49,20 +49,20 @@ TEST_F(HllTest, TestSerializeDeserialize6Bits) {
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT);
+  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
 
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize(byte_array.get(), Format::COMPACT);
+  hll.serialize(byte_array.get(), Format::COMPACT_6BITS);
   /**
    * Maybe we modify this as the codebase matures, but for the time being
    * we expect his fixed length
 
    */
-  const uint32_t ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED_WITH_HDR = 12288U + 8;
-  EXPECT_EQ(length, ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED_WITH_HDR);
+  const uint32_t ARRAY_LENGTH_6BYTES_BUCKETS_COMPRESSED_WITH_HDR = 12288U + 8;
+  EXPECT_EQ(length, ARRAY_LENGTH_6BYTES_BUCKETS_COMPRESSED_WITH_HDR);
 
   Hll<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserialize(byte_array.get(), Format::COMPACT);
+  deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_6BITS);
 
   EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
 }
@@ -76,10 +76,10 @@ TEST_F(HllTest, TestSerializeDeserialize5Bits) {
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT_BASE);
+  uint32_t length = hll.getSynopsisSize(Format::COMPACT_5BITS);
 
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize(byte_array.get(), Format::COMPACT_BASE);
+  hll.serialize(byte_array.get(), Format::COMPACT_5BITS);
   /**
    * Maybe we modify this as the codebase matures, but for the time being
    * we expect his fixed length
@@ -89,7 +89,7 @@ TEST_F(HllTest, TestSerializeDeserialize5Bits) {
   EXPECT_EQ(length, ARRAY_LENGTH_5BYTES_BUCKETS_COMPRESSED_WITH_HDR);
 
   Hll<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_BASE);
+  deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_5BITS);
 
   EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
 }
@@ -105,9 +105,9 @@ TEST_F(HllTest, TestSerializeDeserialize5BitsToFile) {
     hll.add(id);
   }
 
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT_BASE);
+  uint32_t length = hll.getSynopsisSize(Format::COMPACT_5BITS);
   std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize(byte_array.get(), Format::COMPACT_BASE);
+  hll.serialize(byte_array.get(), Format::COMPACT_5BITS);
   std::ofstream temp_file_out("/tmp/tmp1", std::ios::binary | std::ios::out);
   temp_file_out.write(byte_array.get(), length);
   temp_file_out.close();
@@ -120,7 +120,7 @@ TEST_F(HllTest, TestSerializeDeserialize5BitsToFile) {
 
 
   Hll<uint64_t> deserialized_hll(13);
-  deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_BASE);
+  deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_5BITS);
 
   EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
 }

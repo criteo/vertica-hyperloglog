@@ -4,16 +4,13 @@
 #define _HLL_H_
 
 
-#define FORMAT_8BITS 0x1
-#define FORMAT_6BITS 0x2
-#define FORMAT_5BITS 0x4
-
 struct HLLHdr {
   char magic[2] = {'H','L'};
   char format;
   uint8_t bucketBase;
   char padding[4] = {'\0','\0','\0','\0'}; // padding to reach 8 bytes in length
 };
+
 
 template<typename T, typename H = MurMurHash<T> >
 class Hll {
@@ -22,6 +19,14 @@ class Hll {
   LinearCounting linearCounting;
   uint32_t lcThreshold;
   uint32_t biasCorrectedThreshold;
+
+  static uint8_t formatToCode(Format format) {
+    if(format == Format::NORMAL) return 0x01;
+    else if(format == Format::COMPACT_6BITS) return 0x02;
+    else if(format == Format::COMPACT_5BITS) return 0x04;
+    else if(format == Format::COMPACT_4BITS) return 0x08;
+    else assert(0);
+  }
 
 public:
   Hll(uint8_t bucketBits, uint8_t lcBits) : 
@@ -39,12 +44,15 @@ public:
     HLLHdr hdr = *(reinterpret_cast<const HLLHdr*>(byteArray));
     const char* byteArrayHll = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
-      hll.deserializeSparse(byteArrayHll);
-    } else if (format == Format::COMPACT) {
-      hll.deserializeDense(byteArrayHll);
-    } else if (format == Format::COMPACT_BASE) {
+      hll.deserialize8Bits(byteArrayHll);
+
+    } else if (format == Format::COMPACT_6BITS) {
+      hll.deserialize6Bits(byteArrayHll);
+
+    } else if (format == Format::COMPACT_5BITS) {
       uint8_t base = hdr.bucketBase;
-      hll.deserializeWithBase(byteArrayHll, base);
+      hll.deserialize5BitsWithBase(byteArrayHll, base);
+
     } else {
       assert(0);
     }
@@ -55,19 +63,19 @@ public:
     HLLHdr hdr;
     char* byteArrayHll = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
-      hdr.format = FORMAT_8BITS;
+      hdr.format = formatToCode(format);
       memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
 
-      hll.serializeSparse(byteArrayHll);
-    } else if (format == Format::COMPACT) {
-      hdr.format = FORMAT_6BITS;
+      hll.serialize8Bits(byteArrayHll);
+    } else if (format == Format::COMPACT_6BITS) {
+      hdr.format = formatToCode(format);
       memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
 
-      hll.serializeDense(byteArrayHll);
-    } else if (format == Format::COMPACT_BASE) {
-      uint8_t base = hll.serializeWithBase(byteArrayHll);
+      hll.serialize6Bits(byteArrayHll);
+    } else if (format == Format::COMPACT_5BITS) {
+      uint8_t base = hll.serialize5BitsWithBase(byteArrayHll);
       hdr.bucketBase = base;
-      hdr.format = FORMAT_5BITS;
+      hdr.format = formatToCode(format);
 
       memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
     } else {

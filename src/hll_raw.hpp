@@ -15,7 +15,7 @@
 #ifndef _HLL_RAW_H_
 #define _HLL_RAW_H_
 
-enum class Format {NORMAL, COMPACT, COMPACT_BASE};
+enum class Format {NORMAL, COMPACT_6BITS, COMPACT_5BITS, COMPACT_4BITS};
 
 /**
  * T is the hashable type. The class can be used to count various types.
@@ -183,13 +183,13 @@ public:
     if(format == Format::NORMAL) {
       return numberOfBuckets;
 
-    } else if(format == Format::COMPACT) {
+    } else if(format == Format::COMPACT_6BITS) {
       uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
       uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
       uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
       return outputArraySize;
 
-    } else if(format == Format::COMPACT_BASE) {
+    } else if(format == Format::COMPACT_5BITS) {
       // we need 5 bits for every bucket
       // also, these buckets are stored in bytes, so we divide by 8
       return (5 * numberOfBuckets)/8;
@@ -254,14 +254,14 @@ public:
     return hllEstimate;
   }
 
-  void deserializeSparse(const char* byteArray1) {
+  void deserialize8Bits(const char* byteArray1) {
     const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
     for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
       synopsis[i] = byteArray[i];
     }
   }
 
-  void serializeSparse(char* byteArray1) const {
+  void serialize8Bits(char* byteArray1) const {
     unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
     for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
       byteArray[i] = synopsis[i];
@@ -291,7 +291,7 @@ public:
  * which could make the operation significantly slower.
  */
 
-  void deserializeDense(const char* byteArray1) {
+  void deserialize6Bits(const char* byteArray1) {
     //bgidx stands for bucket group index
     //
     const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
@@ -303,7 +303,7 @@ public:
     }
   }
 
-  void serializeDense(char* byteArray1) const {
+  void serialize6Bits(char* byteArray1) const {
     //bgidx stands for bucket group index
     unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
     for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/4; ++bgidx) {
@@ -312,6 +312,7 @@ public:
       byteArray[bgidx*3+2] = (synopsis[bgidx*4+2] << 6 ) | synopsis[bgidx*4+3];
     }
   }
+
 /**
  * Following functions serialize and deserialize the buckets using
  * 5 bits per bucket. To fit the buckets nicely in the array of bytes,
@@ -340,7 +341,7 @@ public:
     }   
   }
 
-  uint8_t serializeWithBase(char* byteArray1) const {
+  uint8_t serialize5BitsWithBase(char* byteArray1) const {
     uint8_t base = *std::min_element(synopsis, synopsis+numberOfBuckets);
     unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
 
