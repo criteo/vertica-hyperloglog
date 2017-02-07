@@ -4,6 +4,10 @@
 #define _HLL_H_
 
 
+struct HLLHdr {
+  char bytes[8];
+};
+
 template<typename T, typename H = MurMurHash<T> >
 class Hll {
 
@@ -24,6 +28,8 @@ public:
   Hll(uint8_t bucketBits) : Hll(bucketBits, bucketBits-4) {}
 
   void deserialize(const char* byteArray, Format format) {
+    // for the time being we skip the header
+    byteArray = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
       hll.deserializeSparse(byteArray);
     } else if (format == Format::COMPACT) {
@@ -34,6 +40,8 @@ public:
   }
 
   void serialize(char* byteArray, Format format) const {
+    // for the time being we skip the header
+    byteArray = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
       hll.serializeSparse(byteArray);
     } else if (format == Format::COMPACT) {
@@ -56,7 +64,7 @@ public:
   // TODO: this function return just size of raw HLL synopsis
   // TODO: there is no header, no linearCounting
   uint32_t getSynopsisSize(Format format) {
-    return hll.getSynopsisSize(format);
+    return hll.getSynopsisSize(format) + sizeof(HLLHdr);
   }
 
 /**

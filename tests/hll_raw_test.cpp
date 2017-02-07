@@ -105,7 +105,6 @@ TEST_F(HllRawTest, TestSerializeDeserializeDenseToFile) {
   }
 
   uint32_t length = hll.getSynopsisSize(Format::COMPACT);
-
   std::unique_ptr<char[]> byte_array(new char[length]);
   hll.serializeDense(byte_array.get());
   std::ofstream temp_file_out("tmp", std::ios::binary | std::ios::out);

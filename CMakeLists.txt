@@ -34,7 +34,7 @@ if (BUILD_TESTS)
 
   # Linking to Hll.cpp. We can't link to libhll.so, because there would
   # be some symbols missing, e.g. Vertica::dummy()
-  add_executable(hll_test tests/hll_test.cpp tests/bias_correction_test.cpp tests/linear_counting_test.cpp src/linear_counting.cpp src/bias_corrected_estimate.cpp)
+  add_executable(hll_test tests/hll_test.cpp tests/hll_raw_test.cpp tests/bias_correction_test.cpp tests/linear_counting_test.cpp src/linear_counting.cpp src/bias_corrected_estimate.cpp)
 
   # Standard linking to googletest stuff.
   target_link_libraries(hll_test gtest gtest_main)
