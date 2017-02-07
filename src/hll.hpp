@@ -4,8 +4,15 @@
 #define _HLL_H_
 
 
+#define FORMAT_8BITS 0x1
+#define FORMAT_6BITS 0x2
+#define FORMAT_5BITS 0x4
+
 struct HLLHdr {
-  char bytes[8];
+  char magic[2] = {'H','L'};
+  char format;
+  uint8_t bucketBase;
+  char padding[4] = {'\0','\0','\0','\0'}; // padding to reach 8 bytes in length
 };
 
 template<typename T, typename H = MurMurHash<T> >
@@ -29,11 +36,15 @@ public:
 
   void deserialize(const char* byteArray, Format format) {
     // for the time being we skip the header
-    byteArray = byteArray + sizeof(HLLHdr);
+    HLLHdr hdr = *(reinterpret_cast<const HLLHdr*>(byteArray));
+    const char* byteArrayHll = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
-      hll.deserializeSparse(byteArray);
+      hll.deserializeSparse(byteArrayHll);
     } else if (format == Format::COMPACT) {
-      hll.deserializeDense(byteArray);
+      hll.deserializeDense(byteArrayHll);
+    } else if (format == Format::COMPACT_BASE) {
+      uint8_t base = hdr.bucketBase;
+      hll.deserializeWithBase(byteArrayHll, base);
     } else {
       assert(0);
     }
@@ -41,11 +52,24 @@ public:
 
   void serialize(char* byteArray, Format format) const {
     // for the time being we skip the header
-    byteArray = byteArray + sizeof(HLLHdr);
+    HLLHdr hdr;
+    char* byteArrayHll = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
-      hll.serializeSparse(byteArray);
+      hdr.format = FORMAT_8BITS;
+      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
+
+      hll.serializeSparse(byteArrayHll);
     } else if (format == Format::COMPACT) {
-      hll.serializeDense(byteArray);
+      hdr.format = FORMAT_6BITS;
+      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
+
+      hll.serializeDense(byteArrayHll);
+    } else if (format == Format::COMPACT_BASE) {
+      uint8_t base = hll.serializeWithBase(byteArrayHll);
+      hdr.bucketBase = base;
+      hdr.format = FORMAT_5BITS;
+
+      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
     } else {
       //TODO: replace it with an exception or sth more meaningful
       assert(0);

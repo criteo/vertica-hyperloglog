@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <cstring>
 #include <cmath>
@@ -14,7 +15,7 @@
 #ifndef _HLL_RAW_H_
 #define _HLL_RAW_H_
 
-enum class Format {NORMAL, COMPACT};
+enum class Format {NORMAL, COMPACT, COMPACT_BASE};
 
 /**
  * T is the hashable type. The class can be used to count various types.
@@ -187,6 +188,12 @@ public:
       uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
       uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
       return outputArraySize;
+
+    } else if(format == Format::COMPACT_BASE) {
+      // we need 5 bits for every bucket
+      // also, these buckets are stored in bytes, so we divide by 8
+      return (5 * numberOfBuckets)/8;
+
     } else {
       //TODO: replace it with an exception or sth more meaningful
       assert(0);
@@ -304,6 +311,57 @@ public:
       byteArray[bgidx*3+1] = (synopsis[bgidx*4+1] << 4)  | (synopsis[bgidx*4+2] >> 2);
       byteArray[bgidx*3+2] = (synopsis[bgidx*4+2] << 6 ) | synopsis[bgidx*4+3];
     }
+  }
+/**
+ * Following functions serialize and deserialize the buckets using
+ * 5 bits per bucket. To fit the buckets nicely in the array of bytes,
+ * we have to split the buckets into groups of 8 and put them in 5
+ * bytes as follows:
+ *
+ *   Byte 0   Byte 1   Byte 2   Byte 3   Byte 4
+ * +--------+--------+--------+--------+--------+---//
+ * +00000111|11222223|33334444|45555566|66677777|...
+ * +--------+--------+--------+--------+--------+---//
+ */
+  void deserialize5BitsWithBase(const char* byteArray1, uint8_t base) {
+    // a cast to be OK with types
+    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+
+    // we iterate over groups of 5 bytes and put them in 8 buckets
+    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/8; ++bgidx) {
+      synopsis[bgidx*8]   = base +   (byteArray[bgidx*5] >> 3);
+      synopsis[bgidx*8+1] = base + (((byteArray[bgidx*5]   & 0x07) << 2) | (byteArray[bgidx*5+1] >> 6));
+      synopsis[bgidx*8+2] = base +  ((byteArray[bgidx*5+1] & 0x3E) >> 1);
+      synopsis[bgidx*8+3] = base + (((byteArray[bgidx*5+1] & 0x01) << 4) | (byteArray[bgidx*5+2] >> 4));
+      synopsis[bgidx*8+4] = base + (((byteArray[bgidx*5+2] & 0x0F) << 1) | (byteArray[bgidx*5+3] >> 7));
+      synopsis[bgidx*8+5] = base +  ((byteArray[bgidx*5+3] & 0x7C) >> 2);
+      synopsis[bgidx*8+6] = base + (((byteArray[bgidx*5+3] & 0x03) << 3) | (byteArray[bgidx*5+4] >> 5));
+      synopsis[bgidx*8+7] = base +   (byteArray[bgidx*5+4] & 0x1F);
+    }   
+  }
+
+  uint8_t serializeWithBase(char* byteArray1) const {
+    uint8_t base = *std::min_element(synopsis, synopsis+numberOfBuckets);
+    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
+
+    // we iterate over
+    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/8; ++bgidx) {
+      uint8_t buckets[8];
+
+      // normalize the buckets, i.e. subtract the base (min. value) and
+      // make sure that the remainder fits into 5 bits (and cut off if not)
+      for(uint32_t bidx = 0; bidx < 8; ++bidx) {
+        uint8_t normBucket = synopsis[bgidx*8 + bidx]-base; // normalized bucket
+        const uint8_t maxValIn5Bits = ((1<<5)-1); // max value fitting 5 bits
+        buckets[bidx] = normBucket > maxValIn5Bits ? maxValIn5Bits : normBucket;
+      }
+      byteArray[bgidx*5]   = (buckets[0] << 3) | (buckets[1] >> 2);
+      byteArray[bgidx*5+1] = (buckets[1] << 6) | (buckets[2] << 1) | (buckets[3] >> 4); 
+      byteArray[bgidx*5+2] = (buckets[3] << 4) | (buckets[4] >> 1);
+      byteArray[bgidx*5+3] = (buckets[4] << 7) | (buckets[5] << 2) | (buckets[6] >> 3);
+      byteArray[bgidx*5+4] = (buckets[6] << 5) | (buckets[7]);
+    }
+    return base;
   }
 
 };
