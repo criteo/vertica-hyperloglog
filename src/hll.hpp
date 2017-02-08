@@ -53,6 +53,10 @@ public:
       uint8_t base = hdr.bucketBase;
       hll.deserialize5BitsWithBase(byteArrayHll, base);
 
+    } else if (format == Format::COMPACT_4BITS) {
+      uint8_t base = hdr.bucketBase;
+      hll.deserialize4BitsWithBase(byteArrayHll, base);
+
     } else {
       assert(0);
     }
@@ -74,6 +78,12 @@ public:
       hll.serialize6Bits(byteArrayHll);
     } else if (format == Format::COMPACT_5BITS) {
       uint8_t base = hll.serialize5BitsWithBase(byteArrayHll);
+      hdr.bucketBase = base;
+      hdr.format = formatToCode(format);
+
+      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
+    } else if (format == Format::COMPACT_4BITS) {
+      uint8_t base = hll.serialize4BitsWithBase(byteArrayHll);
       hdr.bucketBase = base;
       hdr.format = formatToCode(format);
 

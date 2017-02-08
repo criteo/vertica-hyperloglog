@@ -156,4 +156,48 @@ TEST_F(HllTest, TestSerializeDeserialize5BitsToFile) {
 }
 
 
+/**
+ *                **************
+ *                *** 4 BITS ***
+ *                **************
+ */
+TEST_F(HllTest, TestSerializeDeserialize4BitsToFile) {
+  std::vector<uint64_t> ids;
+  for(uint64_t id; data_file >> id;) {
+    ids.push_back(id);
+  }
+
+  for(uint8_t prec = 10; prec <= 18; ++prec) {
+    Hll<uint64_t> hll(prec);
+
+    for(uint64_t id: ids) {
+      hll.add(id);
+    }
+
+    uint32_t length = hll.getSynopsisSize(Format::COMPACT_4BITS);
+    std::unique_ptr<char[]> byte_array(new char[length]);
+    hll.serialize(byte_array.get(), Format::COMPACT_4BITS);
+    std::ofstream temp_file_out("/tmp/tmp1", std::ios::binary | std::ios::out);
+    temp_file_out.write(byte_array.get(), length);
+    temp_file_out.close();
+
+    std::ifstream temp_file_in("/tmp/tmp1", std::ios::binary | std::ios::in);
+    std::unique_ptr<char[]> byte_array2(new char[length]);
+    temp_file_in.read(byte_array2.get(), length);
+    temp_file_in.close();
+    unlink("tmp");
+
+    Hll<uint64_t> deserialized_hll(prec);
+    deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_4BITS);
+
+    /**
+     * With 4 bits we really experience bucket clipping.
+     * To somehow take this this into account, we expect the ser/deserialized estimate
+     * to be off my 10 from the original one.
+     */
+    EXPECT_LT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()+10);
+    EXPECT_GT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()-10);
+  }
+}
+
 } // namespace

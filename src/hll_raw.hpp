@@ -193,7 +193,8 @@ public:
       // we need 5 bits for every bucket
       // also, these buckets are stored in bytes, so we divide by 8
       return (5 * numberOfBuckets)/8;
-
+    } else if(format == Format::COMPACT_4BITS) {
+      return (4 * numberOfBuckets) / 8;
     } else {
       //TODO: replace it with an exception or sth more meaningful
       assert(0);
@@ -345,7 +346,7 @@ public:
     uint8_t base = *std::min_element(synopsis, synopsis+numberOfBuckets);
     unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
 
-    // we iterate over
+    // we iterate over groups of 8 buckets
     for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/8; ++bgidx) {
       uint8_t buckets[8];
 
@@ -365,6 +366,33 @@ public:
     return base;
   }
 
+  void deserialize4BitsWithBase(const char* byteArray1, uint8_t base) {
+    // a cast to be OK with types
+    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+
+    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/2; ++bgidx) {
+      synopsis[bgidx*2]   = base + (byteArray[bgidx] >> 4);
+      synopsis[bgidx*2+1] = base + (byteArray[bgidx] & 0x0f);
+    }
+  }
+
+  uint8_t serialize4BitsWithBase(char* byteArray1) const {
+    uint8_t base = *std::min_element(synopsis, synopsis+numberOfBuckets);
+    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
+
+    const uint8_t maxValIn4Bits = ((1<<4)-1); // max value fitting 4 bits
+    // we iterate over pairs of buckets
+    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/2; ++bgidx) {
+      uint8_t normBucket1 = synopsis[2*bgidx] - base;
+      normBucket1 = (normBucket1 > maxValIn4Bits ? maxValIn4Bits : normBucket1);
+
+      uint8_t normBucket2 = synopsis[2*bgidx+1] - base;
+      normBucket2 = (normBucket2 > maxValIn4Bits ? maxValIn4Bits : normBucket2);
+
+      byteArray[bgidx] = (normBucket1 << 4) | normBucket2;
+    }
+    return base;
+  }
 };
 
 #endif
