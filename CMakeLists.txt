@@ -3,12 +3,18 @@ cmake_minimum_required(VERSION 2.8)
 # Options. Turn on with 'cmake -DBUILD_TESTS=ON'.
 option(BUILD_TESTS "Build all tests." OFF) # Makes boolean 'test' available.
 
+#Turn on with "cmake -DVEC_REPORT=ON"
+option(VEC_REPORT "Display compilation vectorization reports." OFF)
+
 # Make PROJECT_SOURCE_DIR, PROJECT_BINARY_DIR, and PROJECT_NAME available.
 set(PROJECT_NAME vertica-udfs)
 project(${PROJECT_NAME})
 
-set(CMAKE_CXX_FLAGS "-g -Wall -O3 -std=c++11 -Wno-unused-value -fPIC")
+set(CMAKE_CXX_FLAGS "-g -Wall -O3 -march=native -std=c++11 -Wno-unused-value -fPIC")
 
+if(VEC_REPORT)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopt-info-vec-all -ftree-vectorizer-verbose=7")
+endif()
 # Here we say where g++ should look for include files
 set(SDK_HOME /opt/vertica/sdk)
 set(VERTICA_INCLUDE ${SDK_HOME}/include)

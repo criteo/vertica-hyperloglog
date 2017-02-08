@@ -156,9 +156,13 @@ public:
     synopsis[dstBucket] = std::max(synopsis[dstBucket], leftMostSetBit(hashValue));
   }
 
-  void add(const uint8_t otherSynopsis[]) {
-    for (uint64_t i = 0; i < numberOfBuckets; i++) {
-      synopsis[i] = std::max(synopsis[i], otherSynopsis[i]);
+  void add(const uint8_t __restrict__ otherSynopsis[]) {
+    const uint32_t numberOfBucketsConst = numberOfBuckets;
+    uint8_t* __restrict__ synopsis_ = synopsis;
+
+    // note: LOOP VECTORIZED
+    for (uint64_t i = 0; i < numberOfBucketsConst; i++) {
+      synopsis_[i] = std::max(synopsis_[i], otherSynopsis[i]);
     }
   }
 
@@ -203,6 +207,7 @@ public:
 
   uint32_t emptyBucketsCount() const {
     uint32_t emptyBuckets = 0;
+    // note: LOOP VECTORIZED
     for (uint64_t i = 0; i < numberOfBuckets; i++) {
       emptyBuckets += static_cast<uint32_t>(synopsis[i] == 0);
     }
@@ -256,16 +261,24 @@ public:
   }
 
   void deserialize8Bits(const char* byteArray1) {
-    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
-    for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
-      synopsis[i] = byteArray[i];
+    const unsigned char* __restrict__ byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+    uint8_t* __restrict__ synopsis_ = this->synopsis;
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+
+    // note: LOOP VECTORIZED
+    for(uint32_t i=0; i<numberOfBucketsConst; ++i) {
+      synopsis_[i] = byteArray[i];
     }
   }
 
   void serialize8Bits(char* byteArray1) const {
     unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
-    for(uint32_t i=0; i<getNumberOfBuckets(); ++i) {
-      byteArray[i] = synopsis[i];
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+    uint8_t* __restrict__ synopsis_ = this->synopsis;
+
+    // note: LOOP VECTORIZED
+    for(uint32_t i=0; i<numberOfBucketsConst; ++i) {
+      byteArray[i] = synopsis_[i];
     }
   }
 /**
@@ -295,22 +308,30 @@ public:
   void deserialize6Bits(const char* byteArray1) {
     //bgidx stands for bucket group index
     //
-    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
-    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/4; ++bgidx) {
-      synopsis[bgidx*4] = byteArray[bgidx*3] >> 2;
-      synopsis[bgidx*4+1] = ((byteArray[bgidx*3] & 0x3) << 4) | (byteArray[bgidx*3+1] >> 4);
-      synopsis[bgidx*4+2] = ((byteArray[bgidx*3+1] & 0xF) << 2) | (byteArray[bgidx*3+2] >> 6);
-      synopsis[bgidx*4+3] = (byteArray[bgidx*3+2] & 0x3F);
+    const unsigned char* __restrict__ byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+    uint8_t* __restrict__ synopsis_ = this->synopsis;
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+
+    //note: LOOP VECTORIZED
+    for(uint32_t bgidx = 0; bgidx < numberOfBucketsConst/4; ++bgidx) {
+      synopsis_[bgidx*4] = byteArray[bgidx*3] >> 2;
+      synopsis_[bgidx*4+1] = ((byteArray[bgidx*3] & 0x3) << 4) | (byteArray[bgidx*3+1] >> 4);
+      synopsis_[bgidx*4+2] = ((byteArray[bgidx*3+1] & 0xF) << 2) | (byteArray[bgidx*3+2] >> 6);
+      synopsis_[bgidx*4+3] = (byteArray[bgidx*3+2] & 0x3F);
     }
   }
 
   void serialize6Bits(char* byteArray1) const {
     //bgidx stands for bucket group index
-    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
-    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/4; ++bgidx) {
-      byteArray[bgidx*3]   = (synopsis[bgidx*4] << 2)    | (synopsis[bgidx*4+1] >> 4);
-      byteArray[bgidx*3+1] = (synopsis[bgidx*4+1] << 4)  | (synopsis[bgidx*4+2] >> 2);
-      byteArray[bgidx*3+2] = (synopsis[bgidx*4+2] << 6 ) | synopsis[bgidx*4+3];
+    unsigned char* __restrict__ byteArray = reinterpret_cast<unsigned char*>(byteArray1);
+    uint8_t* __restrict__ synopsis_ = this->synopsis;
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+
+    //note: LOOP VECTORIZED
+    for(uint32_t bgidx = 0; bgidx < numberOfBucketsConst/4; ++bgidx) {
+      byteArray[bgidx*3]   = (synopsis_[bgidx*4] << 2)    | (synopsis_[bgidx*4+1] >> 4);
+      byteArray[bgidx*3+1] = (synopsis_[bgidx*4+1] << 4)  | (synopsis_[bgidx*4+2] >> 2);
+      byteArray[bgidx*3+2] = (synopsis_[bgidx*4+2] << 6 ) | synopsis_[bgidx*4+3];
     }
   }
 
@@ -327,33 +348,37 @@ public:
  */
   void deserialize5BitsWithBase(const char* byteArray1, uint8_t base) {
     // a cast to be OK with types
-    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
-
+    const unsigned char* __restrict__ byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+    uint8_t* __restrict__ synopsis_ = this->synopsis;
     // we iterate over groups of 5 bytes and put them in 8 buckets
-    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/8; ++bgidx) {
-      synopsis[bgidx*8]   = base +   (byteArray[bgidx*5] >> 3);
-      synopsis[bgidx*8+1] = base + (((byteArray[bgidx*5]   & 0x07) << 2) | (byteArray[bgidx*5+1] >> 6));
-      synopsis[bgidx*8+2] = base +  ((byteArray[bgidx*5+1] & 0x3E) >> 1);
-      synopsis[bgidx*8+3] = base + (((byteArray[bgidx*5+1] & 0x01) << 4) | (byteArray[bgidx*5+2] >> 4));
-      synopsis[bgidx*8+4] = base + (((byteArray[bgidx*5+2] & 0x0F) << 1) | (byteArray[bgidx*5+3] >> 7));
-      synopsis[bgidx*8+5] = base +  ((byteArray[bgidx*5+3] & 0x7C) >> 2);
-      synopsis[bgidx*8+6] = base + (((byteArray[bgidx*5+3] & 0x03) << 3) | (byteArray[bgidx*5+4] >> 5));
-      synopsis[bgidx*8+7] = base +   (byteArray[bgidx*5+4] & 0x1F);
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+    for(uint32_t bgidx = 0; bgidx < numberOfBucketsConst/8; ++bgidx) {
+      synopsis_[bgidx*8]   = base +   (byteArray[bgidx*5] >> 3);
+      synopsis_[bgidx*8+1] = base + (((byteArray[bgidx*5]   & 0x07) << 2) | (byteArray[bgidx*5+1] >> 6));
+      synopsis_[bgidx*8+2] = base +  ((byteArray[bgidx*5+1] & 0x3E) >> 1);
+      synopsis_[bgidx*8+3] = base + (((byteArray[bgidx*5+1] & 0x01) << 4) | (byteArray[bgidx*5+2] >> 4));
+      synopsis_[bgidx*8+4] = base + (((byteArray[bgidx*5+2] & 0x0F) << 1) | (byteArray[bgidx*5+3] >> 7));
+      synopsis_[bgidx*8+5] = base +  ((byteArray[bgidx*5+3] & 0x7C) >> 2);
+      synopsis_[bgidx*8+6] = base + (((byteArray[bgidx*5+3] & 0x03) << 3) | (byteArray[bgidx*5+4] >> 5));
+      synopsis_[bgidx*8+7] = base +   (byteArray[bgidx*5+4] & 0x1F);
     }   
   }
 
   uint8_t serialize5BitsWithBase(char* byteArray1) const {
     uint8_t base = *std::min_element(synopsis, synopsis+numberOfBuckets);
-    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
+    unsigned char* __restrict__ byteArray = reinterpret_cast<unsigned char*>(byteArray1);
 
     // we iterate over groups of 8 buckets
-    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/8; ++bgidx) {
-      uint8_t buckets[8];
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+    uint8_t __restrict__ buckets[8];
+    uint8_t* __restrict__ synopsis_ = this->synopsis;
+    for(uint32_t bgidx = 0; bgidx < numberOfBucketsConst/8; ++bgidx) {
 
       // normalize the buckets, i.e. subtract the base (min. value) and
       // make sure that the remainder fits into 5 bits (and cut off if not)
       for(uint32_t bidx = 0; bidx < 8; ++bidx) {
-        uint8_t normBucket = synopsis[bgidx*8 + bidx]-base; // normalized bucket
+        const uint32_t bgidx_ = bgidx;
+        uint8_t normBucket = synopsis_[bgidx_*8 + bidx]-base; // normalized bucket
         const uint8_t maxValIn5Bits = ((1<<5)-1); // max value fitting 5 bits
         buckets[bidx] = normBucket > maxValIn5Bits ? maxValIn5Bits : normBucket;
       }
@@ -366,27 +391,41 @@ public:
     return base;
   }
 
+/*
+ * +--------+--------+---//
+ * +00001111|22223333|...
+ * +--------+--------+---//
+ */
   void deserialize4BitsWithBase(const char* byteArray1, uint8_t base) {
-    // a cast to be OK with types
-    const unsigned char* byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
+    // a cast to be OK with the types
+    const unsigned char* __restrict__ byteArray = reinterpret_cast<const unsigned char*>(byteArray1);
 
-    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/2; ++bgidx) {
-      synopsis[bgidx*2]   = base + (byteArray[bgidx] >> 4);
-      synopsis[bgidx*2+1] = base + (byteArray[bgidx] & 0x0f);
+    uint8_t* __restrict__ synopsis_ = synopsis;
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+
+    // note: LOOP VECTORIZED
+    for(uint32_t bgidx = 0; bgidx < numberOfBucketsConst/2; ++bgidx) {
+      synopsis_[bgidx*2]   = base + (byteArray[bgidx] >> 4);
+      synopsis_[bgidx*2+1] = base + (byteArray[bgidx] & 0x0f);
     }
   }
 
   uint8_t serialize4BitsWithBase(char* byteArray1) const {
     uint8_t base = *std::min_element(synopsis, synopsis+numberOfBuckets);
-    unsigned char* byteArray = reinterpret_cast<unsigned char*>(byteArray1);
+    unsigned char* __restrict__ byteArray = reinterpret_cast<unsigned char*>(byteArray1);
 
     const uint8_t maxValIn4Bits = ((1<<4)-1); // max value fitting 4 bits
     // we iterate over pairs of buckets
-    for(uint32_t bgidx = 0; bgidx < getNumberOfBuckets()/2; ++bgidx) {
-      uint8_t normBucket1 = synopsis[2*bgidx] - base;
+    
+    uint8_t* __restrict__ synopsis_ = synopsis;
+    const uint32_t numberOfBucketsConst = getNumberOfBuckets();
+
+    // note: LOOP VECTORIZED
+    for(uint32_t bgidx = 0; bgidx < numberOfBucketsConst/2; ++bgidx) {
+      uint8_t normBucket1 = synopsis_[2*bgidx] - base;
       normBucket1 = (normBucket1 > maxValIn4Bits ? maxValIn4Bits : normBucket1);
 
-      uint8_t normBucket2 = synopsis[2*bgidx+1] - base;
+      uint8_t normBucket2 = synopsis_[2*bgidx+1] - base;
       normBucket2 = (normBucket2 > maxValIn4Bits ? maxValIn4Bits : normBucket2);
 
       byteArray[bgidx] = (normBucket1 << 4) | normBucket2;
