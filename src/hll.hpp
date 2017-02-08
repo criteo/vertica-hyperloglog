@@ -63,35 +63,28 @@ public:
   }
 
   void serialize(char* byteArray, Format format) const {
-    // for the time being we skip the header
+    // for the time being we skip the header and serialize it once
+    // the buckets are written down
     HLLHdr hdr;
-    char* byteArrayHll = byteArray + sizeof(HLLHdr);
-    if(format == Format::NORMAL) {
-      hdr.format = formatToCode(format);
-      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
 
+    char* byteArrayHll = byteArray + sizeof(HLLHdr);
+    uint8_t base = 0;
+    if(format == Format::NORMAL) {
       hll.serialize8Bits(byteArrayHll);
     } else if (format == Format::COMPACT_6BITS) {
-      hdr.format = formatToCode(format);
-      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
-
       hll.serialize6Bits(byteArrayHll);
     } else if (format == Format::COMPACT_5BITS) {
-      uint8_t base = hll.serialize5BitsWithBase(byteArrayHll);
-      hdr.bucketBase = base;
-      hdr.format = formatToCode(format);
-
-      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
+      base = hll.serialize5BitsWithBase(byteArrayHll);
     } else if (format == Format::COMPACT_4BITS) {
-      uint8_t base = hll.serialize4BitsWithBase(byteArrayHll);
-      hdr.bucketBase = base;
-      hdr.format = formatToCode(format);
-
-      memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
+      base = hll.serialize4BitsWithBase(byteArrayHll);
     } else {
       //TODO: replace it with an exception or sth more meaningful
       assert(0);
     }
+    // serialize the header as well
+    hdr.bucketBase = base;
+    hdr.format = formatToCode(format);
+    memcpy(byteArray, reinterpret_cast<char*>(&hdr), sizeof(HLLHdr));
   }
 
   void add(const Hll& other) {
