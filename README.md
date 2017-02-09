@@ -65,7 +65,9 @@ As of today, the only outcome of those tests are the following: they whether run
 To run the tests in a Docker container and auto destroy them, run the following command:
 
 ```
-docker run -v <full_path_of_vertica_rpm>:/tmp/vertica.rpm -v docker-vertica-itests:/opt/vertica --cap-add SYS_NICE --cap-add SYS_RESOURCE --name docker-vertica-itests -ti fjehl/docker-vertica-itests && docker rm docker-vertica-itests
+cd <path_to_dir_containing_dockerfile>
+docker build -t fjehl/docker-vertica-itests .
+docker run -v <full_path_of_vertica_rpm>:/tmp/vertica.rpm -v docker-vertica-itests:/opt/vertica --cap-add SYS_NICE --cap-add SYS_RESOURCE --rm --name docker-vertica-itests -ti fjehl/docker-vertica-itests
 ```
 
 If the container gets somehow corrupted, destroy the volume with persistent storage (named docker-vertica-itests) with the following command:

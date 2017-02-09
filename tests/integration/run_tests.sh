@@ -12,6 +12,8 @@ done
 
 echo "Compiling libraries"
 
+rm /home/dbadmin/src/CMakeCache.txt
+rm -rf /home/dbadmin/src/CMakeFiles
 rm -rf /home/dbadmin/build
 mkdir /home/dbadmin/build && cd $_
 cmake /home/dbadmin/src >/dev/null 2>&1
