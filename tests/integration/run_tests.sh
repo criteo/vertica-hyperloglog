@@ -23,14 +23,13 @@ echoerr -e "${ORANGE}Running test suite...${NC}"
 for test in /home/dbadmin/src/tests/integration/*.sql
 do
   echoerr -n "Running $(basename ${test%.*})..."
-  output=$(/opt/vertica/bin/vsql -U dbadmin -f "$test")
-  if [ $? -eq 0 ]
+  if output=$(/opt/vertica/bin/vsql -U dbadmin -c "$(cat $test)" 2>&1)
   then
     echoerr -e "${GREEN}[SUCCESS]${NC}"
   else
     echoerr -e "${RED}[FAILED]${NC}"
-    echoerr "${RED}$output${NC}"
-    exit 1
+    echoerr -e "${RED}$output${NC}"
+    break
   fi
 done
 echoerr -e "${ORANGE}End of test suite.${NC}"
