@@ -7,7 +7,9 @@
  */
 
 int main(int argc, char** argv) {
-  const uint8_t precision = 14;
+  const uint8_t precision = 12;
+  Format format = Format::COMPACT_4BITS;
+
   // template argument tells which type will be distinct-counted
   // precision (constructor's argument) is a parameter changing the output
   // vector format and avarage estimation error
@@ -21,12 +23,12 @@ int main(int argc, char** argv) {
 
   // depending on the precision and format chosen, the output vector (aka synopsis)
   // will have different size
-  auto synopsisSize = hll.getSynopsisSize(Format::NORMAL);
+  auto synopsisSize = hll.getSynopsisSize(format);
   char outputArray[synopsisSize];
 
   // It's the users responsability to use a
   // buffer with sufficient space.
   // the serialization method is guaranteed not to write out of bounds
-  hll.serialize(outputArray, Format::NORMAL);
+  hll.serialize(outputArray, format);
 
 }
