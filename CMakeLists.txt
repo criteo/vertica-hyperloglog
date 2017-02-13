@@ -21,7 +21,7 @@ set(VERTICA_INCLUDE ${SDK_HOME}/include)
 include_directories(${VERTICA_INCLUDE} include src)
 
 # Here we add all source files to appear in libhll.so
-set(SOURCES src/bias_corrected_estimate.cpp src/linear_counting.cpp src/hll.hpp src/hll_raw.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp)
+set(SOURCES src/bias_corrected_estimate.cpp src/linear_counting.cpp src/hll.hpp src/hll_raw.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp src/hll_vertica.cpp)
 add_library(hll SHARED ${SOURCES})
 
 add_executable(hll_driver tests/hll_driver.cpp src/bias_corrected_estimate.cpp src/linear_counting.cpp )
