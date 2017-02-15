@@ -31,7 +31,11 @@ class HllCreateSynopsis : public AggregateFunction
 
         HLL initialHll(hllLeadingBits);
         this -> synopsisSize = initialHll.getSynopsisSize(format);
-        initialHll.serialize(aggs.getStringRef(0).data(), format);
+        try {
+          initialHll.serialize(aggs.getStringRef(0).data(), format);
+        } catch(SerializationError& e) {
+          vt_report_error(0, e.what());
+        }
     }
 
     void aggregate(ServerInterface &srvInterface,
@@ -39,12 +43,16 @@ class HllCreateSynopsis : public AggregateFunction
                    IntermediateAggs &aggs)
     {
       HLL outputHll(hllLeadingBits);
-      outputHll.deserialize(aggs.getStringRef(0).data(), format);
-      do {
-        const vint &currentValue = argReader.getIntRef(0);
-        outputHll.add(currentValue);
-      } while (argReader.next());
-      outputHll.serialize(aggs.getStringRef(0).data(), format);
+      try {
+        outputHll.deserialize(aggs.getStringRef(0).data(), format);
+        do {
+          const vint &currentValue = argReader.getIntRef(0);
+          outputHll.add(currentValue);
+        } while (argReader.next());
+        outputHll.serialize(aggs.getStringRef(0).data(), format);
+      } catch(SerializationError& e) {
+        vt_report_error(0, e.what());
+      }
     }
 
     virtual void combine(ServerInterface &srvInterface,
@@ -52,13 +60,17 @@ class HllCreateSynopsis : public AggregateFunction
                          MultipleIntermediateAggs &aggsOther)
     {
       HLL outputHll(hllLeadingBits);
-      outputHll.deserialize(aggs.getStringRef(0).data(), format );
-      do {
-        HLL currentSynopsis(hllLeadingBits);
-        currentSynopsis.deserialize(aggsOther.getStringRef(0).data(), format);
-        outputHll.add(currentSynopsis);
-      } while (aggsOther.next());
-      outputHll.serialize(aggs.getStringRef(0).data(), format);
+      try {
+        outputHll.deserialize(aggs.getStringRef(0).data(), format );
+        do {
+          HLL currentSynopsis(hllLeadingBits);
+          currentSynopsis.deserialize(aggsOther.getStringRef(0).data(), format);
+          outputHll.add(currentSynopsis);
+        } while (aggsOther.next());
+        outputHll.serialize(aggs.getStringRef(0).data(), format);
+      } catch(SerializationError& e) {
+        vt_report_error(0, e.what());
+      }
     }
 
     virtual void terminate(ServerInterface &srvInterface,

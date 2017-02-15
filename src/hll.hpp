@@ -1,4 +1,5 @@
 #include "hll_raw.hpp"
+#include <exception>
 
 #ifndef _HLL_H_
 #define _HLL_H_
@@ -9,6 +10,11 @@ struct HLLHdr {
   char format;
   uint8_t bucketBase;
   char padding[4] = {'\0','\0','\0','\0'}; // padding to reach 8 bytes in length
+};
+
+
+struct SerializationError : public virtual std::runtime_error {
+  SerializationError(const char* message) : std::runtime_error(message) {}
 };
 
 
@@ -40,8 +46,11 @@ public:
   Hll(uint8_t bucketBits) : Hll(bucketBits, bucketBits-4) {}
 
   void deserialize(const char* byteArray, Format format) {
-    // for the time being we skip the header
     HLLHdr hdr = *(reinterpret_cast<const HLLHdr*>(byteArray));
+    if(hdr.format != formatToCode(format))
+      throw SerializationError("Requested serialization format is not the same as format"
+        " in the synopsis' header.");
+
     const char* byteArrayHll = byteArray + sizeof(HLLHdr);
     if(format == Format::NORMAL) {
       hll.deserialize8Bits(byteArrayHll);
@@ -58,7 +67,7 @@ public:
       hll.deserialize4BitsWithBase(byteArrayHll, base);
 
     } else {
-      assert(0);
+      throw SerializationError("Unknown format parameter in deserialize().");
     }
   }
 
@@ -78,8 +87,7 @@ public:
     } else if (format == Format::COMPACT_4BITS) {
       base = hll.serialize4BitsWithBase(byteArrayHll);
     } else {
-      //TODO: replace it with an exception or sth more meaningful
-      assert(0);
+      throw SerializationError("Unknown format parameter in serialize().");
     }
     // serialize the header as well
     hdr.bucketBase = base;
@@ -96,8 +104,6 @@ public:
     linearCounting.add(H()(value));
   }
 
-  // TODO: this function return just size of raw HLL synopsis
-  // TODO: there is no header, no linearCounting
   uint32_t getSynopsisSize(Format format) {
     return hll.getSynopsisSize(format) + sizeof(HLLHdr);
   }
