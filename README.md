@@ -53,7 +53,7 @@ First we hash the cookies grouped by day and factory_name using hashing function
 
 For every combination of (factory_name, day) we are going to summarize this set of hashes to a single array of buckets, called a synopsis. Number of buckets is tightly coupled with accuracy of the estimate: the higher it is, the closer the estimate is to the actual cardinality. Let's imagine we pick 16 buckets (substreams). Since log_2(16) = 4, for each hash we will look at the first 4 bits to assign it to a respective bucket.
 
-For the following hash:  *0001*00000**1**11111101010010010
+For the following hash:  *0001* 00000 **1** 11111101010010010
 We have:
 * In italic, the bucket (1),
 * In bold, the first occurrence of 1 in the value bits.
@@ -61,14 +61,14 @@ We have:
 Hence, in the bucket number 1 we store 6, since this is length of the 00...001 pattern in the part following the bucket index bits.
 
 0| 1| 2| 3| 4| 5| 6| 7| 8| 9| 10| 11| 12| 13| 14| 15
--|--|--|--|--|--|--|--|--|--|---|---|---|---|---|---
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---
 0| 6| 0| 0| 0| 0| 0| 0| 0| 0|  0|  0|  0|  0|  0|  0
 
 
 As we process the hashes, every time we see a hash having a bigger number of leading zeros than the length stored in the corresponding bucket, we update the value. Once the whole data set is processed, we obtain a filled array.
 
 0| 1| 2| 3| 4| 5| 6| 7| 8| 9| 10| 11| 12| 13| 14| 15
--|--|--|--|--|--|--|--|--|--|---|---|---|---|---|---
+---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---
 3| 6| 3| 2| 4| 5| 9| 9| 7| 6|  5|  3|  4|  3|  4|  1
 
 This array is a **synopsis** of the whole data set.
