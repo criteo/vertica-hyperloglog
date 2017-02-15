@@ -27,11 +27,13 @@ class Hll {
   uint32_t biasCorrectedThreshold;
 
   static uint8_t formatToCode(Format format) {
-    if(format == Format::NORMAL) return 0x01;
-    else if(format == Format::COMPACT_6BITS) return 0x02;
-    else if(format == Format::COMPACT_5BITS) return 0x04;
-    else if(format == Format::COMPACT_4BITS) return 0x08;
+    uint8_t ret;
+    if(format == Format::NORMAL) ret = 0x01;
+    else if(format == Format::COMPACT_6BITS) ret = 0x02;
+    else if(format == Format::COMPACT_5BITS) ret = 0x04;
+    else if(format == Format::COMPACT_4BITS) ret = 0x08;
     else assert(0);
+    return ret;
   }
 
 public:

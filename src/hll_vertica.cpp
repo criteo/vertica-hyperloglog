@@ -3,16 +3,18 @@
 #include "hll_vertica.hpp"
 
 Format formatCodeToEnum(uint8_t f) {
+  Format ret = Format::NORMAL;
   if(f == 4)
-    return Format::COMPACT_4BITS;
+    ret = Format::COMPACT_4BITS;
   else if(f == 5)
-    return Format::COMPACT_5BITS;
+    ret = Format::COMPACT_5BITS;
   else if(f == 6)
-    return Format::COMPACT_6BITS;
+    ret = Format::COMPACT_6BITS;
   else if(f == 8)
-    return Format::NORMAL;
+    ret = Format::NORMAL;
   else
     vt_report_error(0, "Number of bits per bucket is not recognized: %d", f);
+  return ret;
 }
 
 int readSubStreamBits(ServerInterface &srvInterface) {

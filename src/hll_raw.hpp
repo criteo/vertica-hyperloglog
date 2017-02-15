@@ -74,6 +74,9 @@ private:
     // So that's 1 with 12 ( 16 - 4 ) zeroes 0001 0000 0000 0000, minus one = 0000 1111 1111 1111
     this -> valueMask = (1UL << valueBits ) - 1UL;
 
+    /**
+     * No matter what the serialization method is, we store the buckets as an array of bytes.
+     */
     this -> synopsis = new uint8_t[numberOfBuckets];
   }
 public:
@@ -101,7 +104,6 @@ public:
    */
   HllRaw(uint8_t bucketBits) { 
     init(bucketBits);
-    //TODO: This will not work when buckets won't be a single byte
     memset( synopsis, 0, numberOfBuckets );
   }
 
@@ -184,25 +186,26 @@ public:
   }
 
   uint32_t getSynopsisSize(Format format) {
+    uint32_t ret = 0;
     if(format == Format::NORMAL) {
-      return numberOfBuckets;
+      ret = numberOfBuckets;
 
     } else if(format == Format::COMPACT_6BITS) {
       uint8_t outputBucketSizeBits = static_cast<uint8_t>(std::log2(valueBits) + 0.5); //6
       uint32_t outputArraySizeBits = numberOfBuckets * outputBucketSizeBits;
       uint32_t outputArraySize = outputArraySizeBits >> 3; //12288
-      return outputArraySize;
+      ret = outputArraySize;
 
     } else if(format == Format::COMPACT_5BITS) {
       // we need 5 bits for every bucket
       // also, these buckets are stored in bytes, so we divide by 8
-      return (5 * numberOfBuckets)/8;
+      ret = (5 * numberOfBuckets)/8;
     } else if(format == Format::COMPACT_4BITS) {
-      return (4 * numberOfBuckets) / 8;
+      ret = (4 * numberOfBuckets) / 8;
     } else {
-      //TODO: replace it with an exception or sth more meaningful
       assert(0);
     }
+    return ret;
   }
 
   uint32_t emptyBucketsCount() const {
