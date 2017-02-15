@@ -127,6 +127,7 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
     {
          parameterTypes.addInt("_minimizeCallCount");
          parameterTypes.addInt(HLL_ARRAY_SIZE_PARAMETER_NAME);
+         parameterTypes.addInt(HLL_BITS_PER_BUCKET_PARAMETER_NAME);
     }
 
 };
