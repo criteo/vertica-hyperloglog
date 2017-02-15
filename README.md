@@ -34,7 +34,7 @@ timestamp|factory_name|cookie_name
 2016-04-02T12:23:56 | Paris	| Caramel Chip
 ...	| ... | ...
 
-We want to provide distinct count of cookies by factory or any grain of timestamp above a day in a table that does not have the cookie_name column. Instead, we keep an aggregation of that column as follows:
+We want to provide distinct count of cookies by factory or any grain of timestamps above a day in a table that does not have the cookie_name column. Instead, we keep an aggregation of that column as follows:
 
 day | factory_name | cookies_summary
 ----|--------------|---------
@@ -60,16 +60,16 @@ We have:
 
 Hence, in the bucket number 1 we store 6, since this is length of the 00...001 pattern in the part following the bucket index bits.
 
-0| 1| 2| 3| 4| 5| 6| 7| 8| 9| 10| 11| 12| 13| 14| 15|
--|--|--|--|--|--|--|--|--|--|---|---|---|---|---|---|
-0| 6| 0| 0| 0| 0| 0| 0| 0| 0|  0|  0|  0|  0|  0|  0|
+0| 1| 2| 3| 4| 5| 6| 7| 8| 9| 10| 11| 12| 13| 14| 15
+-|--|--|--|--|--|--|--|--|--|---|---|---|---|---|---
+0| 6| 0| 0| 0| 0| 0| 0| 0| 0|  0|  0|  0|  0|  0|  0
 
 
 As we process the hashes, every time we see a hash having a bigger number of leading zeros than the length stored in the corresponding bucket, we update the value. Once the whole data set is processed, we obtain a filled array.
 
-0| 1| 2| 3| 4| 5| 6| 7| 8| 9| 10| 11| 12| 13| 14| 15|
--|--|--|--|--|--|--|--|--|--|---|---|---|---|---|---|
-3| 6| 3| 2| 4| 5| 9| 9| 7| 6|  5|  3|  4|  3|  4|  1|
+0| 1| 2| 3| 4| 5| 6| 7| 8| 9| 10| 11| 12| 13| 14| 15
+-|--|--|--|--|--|--|--|--|--|---|---|---|---|---|---
+3| 6| 3| 2| 4| 5| 9| 9| 7| 6|  5|  3|  4|  3|  4|  1
 
 This array is a **synopsis** of the whole data set.
 
@@ -87,14 +87,14 @@ In the above formula:
 
 ## Vertica's native implementation
 
-HP's Vertica boasts a HyperLogLog implementantion described in [6] and [7]. In order to estimate its performance we ran a couple of benchmarks. **TODO: describe the benchmarks**.
+HP's Vertica boasts a HyperLogLog implementation described in [6] and [7]. In order to estimate its performance we ran a couple of benchmarks. **TODO: describe the benchmarks**.
 
 Using Vertica's own implementation turned out to be not acceptable for us for three of reasons.
 1. It does not allow creating synopses outside of Vertica. Our goal is to be able to run the first step (synopsis creation) in Hadoop, while there is no obvious way how this could be achieved.
 2. Basic benchmarking job we did proved its performance to be disappointing.
-3. Vertica's implentation does not allow any elasticity in terms of precision or bucket compression used. As a consequence, the synopsis has constant size of 49154 bytes, which is equivalent to 16 bits of precision with a 2-byte header. In our opinion this precision is an overkill in many applications. Further in this readme we show that we are able to achieve better accuracy than the native implementation with as little as 1/5 of required storage.
+3. Vertica's implementation does not allow any elasticity in terms of precision or bucket compression used. As a consequence, the synopsis has constant size of 49154 bytes, which is equivalent to 16 bits of precision with a 2-byte header. In our opinion this precision is an overkill in many applications. Further in this readme we show that we are able to achieve better accuracy than the native implementation with as little as 1/5 of required storage.
 
-## Modification's to the orignal HLL algorithm
+## Modification's to the original HLL algorithm
 
 As pointed out in [5] HyperLogLog has a large error for small cardinalities. For example, when number of buckets is equal to 16384 (i.e. precision is 14 bits), the algorithm will yield an estimate of ~11000 for **no elements**, i.e. when all the buckets are equal to zero. In other words, the smallest possible estimate given by the algorithm is 11k.
 
@@ -107,7 +107,7 @@ An important observation made by Google in [6] is that the algorithm always over
 
 ### Hash function
 
-According to [6] there is no significant difference between various hash functions. However, length of the hash makes a huge difference when the cardinality approaches the number of unique values it can generate. For instance for 32 bit hashes and cardinalities close to *2^32* the hash colisions would become more common. As a result, an accurate estimation would become impossible. Following [6], In our HyperLogLog implementation we use 64 bit MurMurHash.
+According to [6] there is no significant difference between various hash functions. However, length of the hash makes a huge difference when the cardinality approaches the number of unique values it can generate. For instance for 32 bit hashes and cardinalities close to *2^32* the hash collisions would become more common. As a result, an accurate estimation would become impossible. Following [6], In our HyperLogLog implementation we use 64 bit MurMurHash.
 
 ### LinearCounting
 
@@ -132,7 +132,7 @@ Google Engineers studied the problem of the bias in their paper. Below one can s
 
 ![HLL Bias](http://oi66.tinypic.com/23l12rm.jpg)
 
-In the appendix [7] to [6] Google published empirical bias values. In our implementation we use these data to return a more accurate estimate. To this end, we keep two arrays: `rawEstimateData[][]` and `biasData[][]` whose values are taken from [7]. For the given number of precision bits *p* we look in `rawEstimateData[p]` for the 6 values that are closest to the raw estimate. Then, we use their indices to look for corresponding bias values in `biasData[p]`. We calculate mean value of these 6 values and subtract it from the raw estimate.
+In the appendix [7] to [6] Google published empirical bias values. In our implementation we use these data to return a more accurate estimate. To this end, we keep two arrays: `rawEstimateData[][]` and `biasData[][]` whose values are taken from [7]. For the given number of precision bits *p* we look in `rawEstimateData[p][]` for the 6 values that are closest to the raw estimate. Then, we use their indices to look for corresponding bias values in `biasData[p][]`. We calculate mean value of these 6 values and subtract it from the raw estimate.
 
 ### Compacting registers
 
