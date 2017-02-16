@@ -8,6 +8,8 @@ The algorithm is implemented as two C++ UDAFs (User Defined Aggregate Function):
 
 In the following sections we describe HyperLogLog together with the tweaks to the original algorithm, so that even someone not acquainted with the algorithm might easily get understanding of how it works.
 
+**TODO: add a "How to contribute?" section**
+
 ## Introduction
 
 HyperLogLog is an algorithm used for estimating cardinality of a multiset. Multiset is a bag values which don't have to unique. There might be repetitions in a mulitset, meaning that the total number of elements might be different from the number of unique elements.
@@ -155,7 +157,7 @@ We lay out the compacted buckets in memory as follows.
 
 ### Adding some more compactness
 
-As pointed out in [2] (and originally in [11]), buckets' values increase in similar pace. For instance, if we had 8 buckets and we stored there 8*2^10 unique values, each register would store a value close to 10. Obviously, it's not entirely true, because, unless we are incredibly lucky, there will be some deviation, but we bet it won't be significant.
+As pointed out in [2] and originally in [11], buckets' values increase in similar pace. For instance, if we had 8 buckets and we stored there 8*2^10 unique values, each register would store a value close to 10. Obviously, it's not entirely true, because, unless we are incredibly lucky, there will be some deviation, but we bet it won't be significant.
 
 Following [2] we came up with the idea of compacting the buckets to 5 and 4 bits. At first glance these buckets will be too short, because they can represent sequences of *2^5 = 32* and *2^4 = 16* respectively, i.e. *2^31* and *2^15 = 32,768* uniques. The latter case is particularly worrying because it would clearly put strong limitations on where HyperLogLog could by applied. When serializing the synopsis with 4 bits per bucket, if we encountered bucket values higher than 15, we would have to clip them to 15 anyway, because this would be the highest value we could represent. In turn, this would impact the estimate and effectively mean losing unique values. For instance, even with 16k registers we couldn't get higher estimate than ~536M.
 
@@ -176,7 +178,7 @@ For instance, if we had 4 registers with values 3,5,7 and 4, the offset would be
 
 #### 5 and 4 bits per bucket
 
-To fit the buckets nicely in the array of bytes when using 5 bits per bucket, we split the buckets into groups of 8 and arrange them in 5 bytes as depicted below. Please note that serialization and deserialization operations with 5 bits per bucket doesn't get automatically vectorized by gcc 4.8.5 (as opposed to 8, 6 and 4-bits-per-bucket operations).
+To fit the buckets nicely in the array of bytes when using 5 bits per bucket, we split the buckets into groups of 8 and arrange them in 5 bytes as depicted below. Please note that serialization and deserialization operations with 5 bits per bucket do not get automatically vectorized by gcc 4.8.5 (as opposed to 8, 6 and 4-bits-per-bucket operations).
 
 ```
 Byte 0   Byte 1   Byte 2   Byte 3   Byte 4
@@ -197,7 +199,7 @@ Byte 0   Byte 1
 
 ## Using HyperLogLog in Vertica
 
-From the Vertica's point of view a synopsis is VARBINARY. Its size depends on the number of precision bits and compactness (number of bits per bucket). In the table below one can consult for different values of parameters.
+From the Vertica's point of view a synopsis is VARBINARY. Its size depends on the number of precision bits and compactness (number of bits per bucket). The table below characterizes shows synopsis for different values of parameters.
 
 | | p=10 | p=11 | p=12 | p=13 | p=14 | p=15
 --------|------|------|------|------|------|-----
@@ -265,6 +267,8 @@ GROUP BY
 
 ## Latency and accuracy benchmarks
 To measure latency and accuracy we ran the queries from the listings above on some real data used at Criteo. They were run a cluster of three nodes on a table containing around 364M rows. In our query we used one third of the whole table.
+
+**TODO: add benchmarks on partitioned and ordered data (projection)**
 
 ##### Accuracy results
 Version|Precision|Mean Error (%)|Error std. dev (%)|Max error (%)
