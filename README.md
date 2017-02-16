@@ -92,7 +92,7 @@ HP's Vertica boasts a HyperLogLog implementation described in [6] and [7]. In or
 Using Vertica's own implementation turned out to be not acceptable for us for three of reasons.
 1. It does not allow creating synopses outside of Vertica. Our goal is to be able to run the first step (synopsis creation) in Hadoop, while there is no obvious way how this could be achieved.
 2. Basic benchmarking job we did proved its performance to be disappointing.
-3. Vertica's implementation does not allow any elasticity in terms of precision or bucket compression used. As a consequence, the synopsis has constant size of 49154 bytes, which is equivalent to 16 bits of precision with a 2-byte header. In our opinion this precision is an overkill in many applications. Further in this readme we show that we are able to achieve better accuracy than the native implementation with as little as 1/5 of required storage.
+3. Vertica's implementation does not allow any elasticity in terms of precision or bucket compression used. As a consequence, the synopsis has a constant size of 49154 bytes, which is probably an equivalent of 16 bits of precision with a 2-byte header. In our opinion this precision is an overkill in many applications. Further in this readme we show that we are able to achieve better accuracy than the native implementation with as little as 1/5 of required storage.
 
 ## Modification's to the original HLL algorithm
 
@@ -101,8 +101,8 @@ As pointed out in [5] HyperLogLog has a large error for small cardinalities. For
 An important observation made by Google in [6] is that the algorithm always overestimates the real cardinality for smaller sets. In our implementation we took into account the remedy suggested by Google, i.e. we composed raw HyperLogLog, BiasCorrection and LinearCounting together. To return an estimate we first calculate a raw HyperLogLog estimate and then apply the following logic (note: *m* means the number of buckets):
 
 
-1. If the raw estimate is between +Inf and 5m, we leave it as it.
-2. If the raw estimate is below 5m, but above a certain threshold determined experimentally, we subtract a bias from the raw estimate. Below we describe in details how this is achieved step by step.
+1. If the raw estimate is between $`+\infty`$ and *5m*, we leave it as it.
+2. If the raw estimate is below *5m*, but above a certain threshold determined experimentally, we subtract a bias from the raw estimate. Below we describe in details how this is achieved step by step.
 3. Otherwise, we try to use LinearCounting if it's applicable. LinearCounting returns a valuable result when at least one of the original HLL buckets is empty. If it's not the case, our final result is a raw estimate shifted by bias.
 
 ### Hash function
@@ -124,7 +124,7 @@ where:
 * `m` is number of buckets
 * `log` is a natural logarithm
 
-LinearCounting is inaccurate for high cardinalities, but for the small ones is just right. This means that as the cardinality grows, we have to switch from LinearCounting to raw HyperLogLog. In [1] the authors set a threshold of 2.5m, but above this threshold the result is sill highly biased. To prevent it we implemented another improvement proposed the Google engineers [2] called...
+LinearCounting is inaccurate for high cardinalities, but for the small ones is just right. This means that as the cardinality grows, we have to switch from LinearCounting to raw HyperLogLog. In [1] the authors set a threshold of *2.5m*, but above this threshold the result is sill highly biased. To prevent it we implemented another improvement proposed the Google engineers [2] called...
 
 ### Bias Correction
 
@@ -208,12 +208,12 @@ From the Vertica's point of view a synopsis is VARBINARY. Its size depends on th
 
 A general formula for the synopsis' size is (note a constant 8 comes from the header size):
 
-S = B * 2^p + 8
+  S = B * 2^p + 8
 
 Where:
-- S is synopsis size
-- B is number of bits per bucket
-- p is number of precision bits
+- `S` is synopsis size
+- `B` is number of bits per bucket
+- `p` is number of precision bits
 
 This representation has never been tested on a big-endian machine. Hence, it's safe to assume that it only works on little-endian machines.
 
@@ -397,15 +397,15 @@ docker volume rm docker-vertica-itests
 This work is distributed under the Apache License, Version 2.0.
 
 ## References
-1. http://algo.inria.fr/flajole/Publications/FlFuGaMe07.pdf
-2. http://druid.io/blog/2012/05/04/fast-cheap-and-98-right-cardinality-estimation-for-big-data.html
-3. http://druid.io/blog/2014/02/18/hyperloglog-optimizations-for-real-world-systems.html
-4. http://antirez.com/news/75
-5. https://github.com/antirez/redis/blob/unstable/src/hyperloglog.c
-6. https://stefanheule.com/papers/edbt13-hyperloglog.pdf
-7. https://docs.google.com/document/d/1gyjfMHy43U9OWBXxfaeG-3MjGzejW1dlpyMwEYAAWEI/view?fullscreen
-8. https://my.vertica.com/docs/7.1.x/HTML/Content/Authoring/SQLReferenceManual/Functions/Aggregate/APPROXIMATE_COUNT_DISTINCT_SYNOPSIS.htm
-8. https://my.vertica.com/docs/7.1.x/HTML/Content/Authoring/SQLReferenceManual/Functions/Aggregate/APPROXIMATE_COUNT_DISTINCT_OF_SYNOPSIS.htm
-9. https://research.neustar.biz/2013/01/24/hyperloglog-googles-take-on-engineering-hll/
-10. https://www.facebook.com/notes/facebook-engineering/presto-interacting-with-petabytes-of-data-at-facebook/10151786197628920
-11. http://organ.kaist.ac.kr/Prof/pdf/Whang1990(linear).pdf
+1. [P.Flajolet et al., HyperLogLog: the analysis of a near-optimal cardinality estimation algorithm ](http://algo.inria.fr/flajolet/Publications/FlFuGaMe07.pdf)
+2. [F.Yang, Druid: Fast, Cheap, and 98% Right: Cardinality Estimation for Big Data ](http://druid.io/blog/2012/05/04/fast-cheap-and-98-right-cardinality-estimation-for-big-data.html)
+3. [N.Ray and F.Yang, Druid: How We Scaled HyperLogLog: Three Real-World Optimizations](http://druid.io/blog/2014/02/18/hyperloglog-optimizations-for-real-world-systems.html)
+4. [Redis new data structure: the HyperLogLog](http://antirez.com/news/75)
+5. [Redis' HyperLogLog source code](https://github.com/antirez/redis/blob/unstable/src/hyperloglog.c)
+6. [HyperLogLog in Practice: Algorithmic Engineering of a State of The Art Cardinality Estimation Algorithm, S.Heule et. al](https://stefanheule.com/papers/edbt13-hyperloglog.pdf)
+7. [S.Heule et al., Appendix to HyperLogLog in Practice: Algorithmic Engineering of a State of the Art Cardinality Estimation Algorithm](https://docs.google.com/document/d/1gyjfMHy43U9OWBXxfaeG-3MjGzejW1dlpyMwEYAAWEI/view?fullscreen)
+8. [HP Vertica's documentation on APPROXIMATE_COUNT_DISTINCT_SYNOPSIS]( https://my.vertica.com/docs/7.1.x/HTML/Content/Authoring/SQLReferenceManual/Functions/Aggregate/APPROXIMATE_COUNT_DISTINCT_SYNOPSIS.htm)
+8. [HP Vertica's documentation on APPROXIMATE_COUNT_DISTINCT_OF_SYNOPSIS]( https://my.vertica.com/docs/7.1.x/HTML/Content/Authoring/SQLReferenceManual/Functions/Aggregate/APPROXIMATE_COUNT_DISTINCT_OF_SYNOPSIS.htm)
+9. [T.Karnezos, HyperLogLog++: Google’s Take On Engineering HLL]( https://research.neustar.biz/2013/01/24/hyperloglog-googles-take-on-engineering-hll/)
+10. [L.Chan, Presto: Interacting with petabytes of data at Facebook]( https://www.facebook.com/notes/facebook-engineering/presto-interacting-with-petabytes-of-data-at-facebook/10151786197628920)
+11. [K-Y.Whang, A Linear-Time Probabilistic Counting Algorithm for Database Applications](http://organ.kaist.ac.kr/Prof/pdf/Whang1990(linear).pdf)
