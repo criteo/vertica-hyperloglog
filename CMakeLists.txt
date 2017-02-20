@@ -15,14 +15,28 @@ set(CMAKE_CXX_FLAGS "-g -Wall -O3 -march=native -std=c++11 -Wno-unused-value -fP
 if(VEC_REPORT)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopt-info-vec-all -ftree-vectorizer-verbose=7")
 endif()
+
 # Here we say where g++ should look for include files
-set(SDK_HOME CACHE STRING /opt/vertica/sdk)
+set(SDK_HOME /opt/vertica/sdk CACHE FILEPATH "Path to the Vertica SDK, by default /opt/vertica/sdk")
+if(NOT EXISTS ${SDK_HOME})
+  message(FATAL_ERROR "Could not build. No SDK found at ${SDK_HOME} (maybe retry with -DSDK_HOME=<sdk_path>).")
+endif()
+
+
 set(VERTICA_INCLUDE ${SDK_HOME}/include)
 include_directories(${VERTICA_INCLUDE} include src)
 
 # Here we add all source files to appear in libhll.so
 set(SOURCES src/bias_corrected_estimate.cpp src/linear_counting.cpp src/hll.hpp src/hll_raw.hpp src/HllCreateSynopsis.cpp src/HllDistinctCount.cpp ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp src/hll_vertica.cpp)
 add_library(hll SHARED ${SOURCES})
+
+# Installation process just copies the binary HLL to Vertica lib folder
+set(LIB_DIR /opt/vertica/lib)
+install(
+  TARGETS hll
+  DESTINATION ${LIB_DIR}
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+)
 
 add_executable(hll_driver tests/hll_driver.cpp src/bias_corrected_estimate.cpp src/linear_counting.cpp )
 
