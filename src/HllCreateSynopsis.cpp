@@ -124,8 +124,15 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
                                   SizedColumnTypes &parameterTypes)
     {
          parameterTypes.addInt("_minimizeCallCount");
-         parameterTypes.addInt(HLL_ARRAY_SIZE_PARAMETER_NAME);
-         parameterTypes.addInt(HLL_BITS_PER_BUCKET_PARAMETER_NAME);
+
+         SizedColumnTypes::Properties props;
+         props.required = false;
+         props.canBeNull = false;
+         props.comment = "Precision bits";
+         parameterTypes.addInt(HLL_ARRAY_SIZE_PARAMETER_NAME, props);
+
+         props.comment = "Serialization/deserialization bits per bucket";
+         parameterTypes.addInt(HLL_BITS_PER_BUCKET_PARAMETER_NAME, props);
     }
 
 };

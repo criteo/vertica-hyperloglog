@@ -18,9 +18,10 @@ class HllDistinctCount : public AggregateFunction
     virtual void initAggregate(ServerInterface &srvInterface, IntermediateAggs &aggs)
     {
         ParamReader paramReader= srvInterface.getParamReader();
-        if (! paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
-            vt_report_error(0, "Parameter %s is mandatory!", HLL_ARRAY_SIZE_PARAMETER_NAME);
-        hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
+        if (paramReader.containsParameter(HLL_ARRAY_SIZE_PARAMETER_NAME) )
+          hllLeadingBits = paramReader.getIntRef(HLL_ARRAY_SIZE_PARAMETER_NAME);
+        else
+          hllLeadingBits = HLL_ARRAY_SIZE_DEFAULT_VALUE;
 
         if(paramReader.containsParameter(HLL_BITS_PER_BUCKET_PARAMETER_NAME))
           this->format = formatCodeToEnum(paramReader.getIntRef(HLL_BITS_PER_BUCKET_PARAMETER_NAME));
@@ -125,9 +126,16 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
     virtual void getParameterType(ServerInterface &srvInterface,
                                   SizedColumnTypes &parameterTypes)
     {
-         parameterTypes.addInt("_minimizeCallCount");
-         parameterTypes.addInt(HLL_ARRAY_SIZE_PARAMETER_NAME);
-         parameterTypes.addInt(HLL_BITS_PER_BUCKET_PARAMETER_NAME);
+      parameterTypes.addInt("_minimizeCallCount");
+
+      SizedColumnTypes::Properties props;
+      props.required = false;
+      props.canBeNull = false;
+      props.comment = "Precision bits";
+      parameterTypes.addInt(HLL_ARRAY_SIZE_PARAMETER_NAME, props);
+
+      props.comment = "Serialization/deserialization bits per bucket";
+      parameterTypes.addInt(HLL_BITS_PER_BUCKET_PARAMETER_NAME, props);
     }
 
 };
