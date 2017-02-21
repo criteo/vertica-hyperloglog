@@ -120,7 +120,7 @@ TEST_F(HllTest, TestSerializeDeserialize5Bits) {
  *                **************
  *
  * This test shares the logic with the test above.
- * However, it saves the data in a file and then reads it back in. 
+ * However, it saves the data in a file and then reads it back in.
  */
 TEST_F(HllTest, TestSerializeDeserialize5BitsToFile) {
   std::vector<uint64_t> ids;
@@ -198,6 +198,27 @@ TEST_F(HllTest, TestSerializeDeserialize4BitsToFile) {
     EXPECT_LT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()+10);
     EXPECT_GT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()-10);
   }
+}
+
+
+TEST_F(HllTest, TestWrongParametersSerializationThrowsError) {
+  Hll<uint64_t> hll(14);
+
+  for(uint64_t id; data_file >> id;) {
+    hll.add(id);
+  }
+
+  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
+  std::unique_ptr<char[]> byte_array(new char[length]);
+  hll.serialize(byte_array.get(), Format::COMPACT_6BITS);
+
+  Hll<uint64_t> deserialized_hll(14);
+  // NOTE: serialization was done using 6 bits, here we use 5
+  // this is an incorrect usage and should throw an erro
+  ASSERT_THROW(deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_5BITS), SerializationError);
+
+  // this usage is legit, as the synopsis was serialized using 6 bits per bucket
+  ASSERT_NO_THROW(deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_6BITS));
 }
 
 } // namespace
