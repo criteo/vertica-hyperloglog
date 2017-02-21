@@ -63,7 +63,7 @@ public:
 
 /**
  * This test checks serialization and deserialization in the 6-bits format, i.e.
- * where 4 buckets are compressed to 3 bytes. An instance of HllRaw is serialized 
+ * where 4 buckets are compressed to 3 bytes. An instance of HllRaw is serialized
  * and then another instance of HllRaw is created and used as a target for
  * deserialization. The expected result is that both HllRaws give the same
  * estimation and are bitwise equal.
@@ -95,7 +95,7 @@ TEST_F(HllRawTest, TestSerializeDeserialize6Bits) {
 
 /**
  * This test shares the logic with the one above.
- * However, it saves the data in a file and then reads it back in. 
+ * However, it saves the data in a file and then reads it back in.
  */
 TEST_F(HllRawTest, TestSerializeDeserialize6BitsToFile) {
   HllRaw<uint64_t> hll(14);
@@ -124,6 +124,8 @@ TEST_F(HllRawTest, TestSerializeDeserialize6BitsToFile) {
   EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
   EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
 }
+
+
 
 
 
@@ -176,17 +178,17 @@ TEST_F(HllRawTest, TestErrorWithinRangeForDifferentBucketMasks) {
   for(auto& bits_hll: hlls) {
     uint8_t basket_bits = bits_hll.first;
     HllRaw<uint64_t> hll = bits_hll.second;
-    
+
     int64_t approximated_cardinality = static_cast<uint64_t>(hll.estimate());
 
     uint32_t m = 2 << basket_bits;
     /**
-     * The paper says that the relative error is typically lower than 
+     * The paper says that the relative error is typically lower than
      * 1.04/sqrt(m)
      */
     double expected_error = 1.04/std::sqrt(m);
     double real_error = std::abs(real_cardinality-approximated_cardinality)/real_cardinality;
-    
+
     EXPECT_LT(real_error, expected_error*error_tolerance);
   }
 }
@@ -234,7 +236,7 @@ TEST_F(HllRawTest, TestNonStandardSynopsisSize) {
 TEST_F(HllRawTest, TestSynopsisAdditionAssociativity) {
   HllRaw<uint64_t> hll1(14), hll2(14), hll1plus2(14);
   std::vector<uint32_t> ids;
-  ids.reserve(1000000); 
+  ids.reserve(1000000);
   for(uint32_t id; data_file >> id;) {
     ids.push_back(id);
   }
@@ -255,7 +257,7 @@ TEST_F(HllRawTest, TestSynopsisAdditionAssociativity) {
 
 /**
  * This test uses a hash function accepting 32 bit values. The target values are
- * 64 bits long, but this should work as well. 
+ * 64 bits long, but this should work as well.
  */
 TEST_F(HllRawTest, Test32BitHash) {
   HllRaw<uint32_t> hll(14);

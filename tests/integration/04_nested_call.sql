@@ -1,3 +1,4 @@
+\set ON_ERROR_STOP on
 select HllDistinctCount(synopsis USING PARAMETERS hllLeadingBits=11) as cnt
 from
 (

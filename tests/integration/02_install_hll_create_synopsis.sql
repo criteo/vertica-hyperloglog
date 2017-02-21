@@ -1,3 +1,4 @@
+\set ON_ERROR_STOP on
 CREATE OR REPLACE AGGREGATE FUNCTION HllCreateSynopsis
 AS LANGUAGE 'C++'
 NAME 'HllCreateSynopsisFactory'

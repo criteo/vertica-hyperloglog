@@ -40,6 +40,11 @@ install(
 
 add_executable(hll_driver tests/hll_driver.cpp src/bias_corrected_estimate.cpp src/linear_counting.cpp )
 
+option(BUILD_DATA_GEN "Build data generator for functional tests in Vertica" OFF)
+if(BUILD_DATA_GEN)
+  add_executable(data_gen tests/data_gen.cpp)
+endif()
+
 # Below we define a variable BUILD_TESTS which can be toggled e.g. with ccmake
 # It says whether the tests should be built at all
 if (BUILD_TESTS)
@@ -49,7 +54,7 @@ if (BUILD_TESTS)
   enable_testing()
 
   # Include the gtest library. gtest_SOURCE_DIR is available due to
-  # inclusion of googletest subdirectory with another cmake file 
+  # inclusion of googletest subdirectory with another cmake file
   include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} src)
 
   # Linking to Hll.cpp. We can't link to libhll.so, because there would
