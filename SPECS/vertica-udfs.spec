@@ -4,13 +4,15 @@ Release:        1%{?dist}
 Summary:        HyperLogLog UDF for Vertica
 
 License:        GPLv2+
-URL:            https://gitlab.criteois.com/vertica/vertica-udfs
-Source0:        https://gitlab.criteois.com/vertica/vertica-udfs/repository/archive.tar.gz
+URL:            https://gitlab.criteois.com/rpm-packages/%{name}
+Source0:        https://gitlab.criteois.com/rpm-packages/%{name}/repository/archive.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}
 
 BuildRequires:  gcc-c++
 BuildRequires:  make
 BuildRequires:  cmake
+BuildRequires:  openssh
+BuildRequires:  dialog
 BuildRequires:  vertica
 Requires:       vertica
 
@@ -18,10 +20,10 @@ Requires:       vertica
 For complete documentation, see the project home page on GitHub.
 
 %prep
-%setup -q
+%setup -q # -c %{name}-%{version}
 
 %build
-%cmake -DSDK_HOME='/opt/vertica/sdk' .
+%cmake -DSDK_HOME='/opt/vertica/sdk' vertica-udfs-master-*
 make %{?_smp_mflags}
 
 %install
@@ -32,8 +34,8 @@ rm -rf $RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 
 %files
-%defattr(755, root, root, 755)
-/opt/vertica/lib/libhll.so
+#%defattr(755, root, root, 755)
+#/opt/vertica/lib/libhll.so
 
 %doc
 
