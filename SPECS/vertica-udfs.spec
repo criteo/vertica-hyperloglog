@@ -23,7 +23,7 @@ For complete documentation, see the project home page on GitHub.
 %setup -q # -c %{name}-%{version}
 
 %build
-%cmake -DSDK_HOME='/opt/vertica/sdk' vertica-udfs-master-*
+%cmake -DSDK_HOME='/opt/vertica/sdk' -DBUILD_TESTS=ON vertica-udfs-master-*
 make %{?_smp_mflags}
 
 %install
@@ -36,6 +36,10 @@ rm -rf $RPM_BUILD_ROOT
 %files
 #%defattr(755, root, root, 755)
 #/opt/vertica/lib/libhll.so
+
+%check
+cat vertica-udfs-master-*/CMakeLists.txt
+make check
 
 %doc
 

@@ -22,7 +22,6 @@ if(NOT EXISTS ${SDK_HOME})
   message(FATAL_ERROR "Could not build. No SDK found at ${SDK_HOME} (maybe retry with -DSDK_HOME=<sdk_path>).")
 endif()
 
-
 set(VERTICA_INCLUDE ${SDK_HOME}/include)
 include_directories(${VERTICA_INCLUDE} include src)
 
@@ -45,6 +44,9 @@ if(BUILD_DATA_GEN)
   add_executable(data_gen tests/data_gen.cpp)
 endif()
 
+add_custom_target(check COMMAND ctest -V)
+add_test(hll_test hll_test)
+
 # Below we define a variable BUILD_TESTS which can be toggled e.g. with ccmake
 # It says whether the tests should be built at all
 if (BUILD_TESTS)
@@ -60,7 +62,7 @@ if (BUILD_TESTS)
   # Linking to Hll.cpp. We can't link to libhll.so, because there would
   # be some symbols missing, e.g. Vertica::dummy()
   add_executable(hll_test tests/hll_test.cpp tests/hll_raw_test.cpp tests/bias_correction_test.cpp tests/linear_counting_test.cpp src/linear_counting.cpp src/bias_corrected_estimate.cpp)
-
+  add_dependencies(check hll_test)
   # Standard linking to googletest stuff.
   target_link_libraries(hll_test gtest gtest_main)
 
