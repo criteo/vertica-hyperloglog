@@ -29,23 +29,21 @@ class LinearCountingTest : public ::testing::Test {
   }
 
   void generateNumbers(std::set<uint64_t>& s, uint32_t cardinality) {
-    std::srand(0);
-    for(uint32_t i=s.size(); i < cardinality; ++i)
-      s.insert(std::rand());
-    while(s.size() < cardinality)
-      s.insert(std::rand());
+      std::srand(0);
+      while(s.size() < cardinality) {
+          uint64_t missing = cardinality - s.size();
+          for(uint32_t i=0; i < missing; ++i)
+              s.insert(std::rand());
+      }
   }
 };
 
 
 TEST_F(LinearCountingTest, TestLinearCounting) {
   std::set<uint64_t> ids;
-  for(uint32_t precision=11; precision < 18; ++precision) {
-    // For LC we use 5 orders of magnitude lower precision than for HLL
-    // e.g. if HLL uses 10 bits of precision (2**10 buckets), LC will
-    // have 2**5 bits, i.e. 2**3 = 8 bytes 
-    LinearCounting lc(precision-5);
-    HllRaw<uint64_t> hll(precision); 
+  for(uint32_t precision=7; precision < 18; ++precision) {
+    LinearCounting lc(precision);
+    HllRaw<uint64_t> hll(precision);
 
     MurMurHash<uint64_t> hash;
 
@@ -66,6 +64,6 @@ TEST_F(LinearCountingTest, TestLinearCounting) {
     // /cout << precision << " " << realCardinality << " " << lcEstimate << " " << bcEstimate << endl;
     uint32_t lcError = abs(static_cast<int32_t>(lcEstimate)-static_cast<int32_t>(realCardinality));
     uint32_t bcError = abs(static_cast<int32_t>(bcEstimate)-static_cast<int32_t>(realCardinality));
-    EXPECT_LT(lcError, bcError);
+    EXPECT_TRUE((lcError+bcError)/2 == bcError || lcError < bcError);
   }
 }
