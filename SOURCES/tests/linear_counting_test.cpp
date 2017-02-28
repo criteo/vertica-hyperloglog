@@ -1,19 +1,20 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+
+#include "base_test.hpp"
 #include "gtest/gtest.h"
 #include "linear_counting.hpp"
 #include "hll.hpp"
 
 using namespace std;
 
-class LinearCountingTest : public ::testing::Test {
+class LinearCountingTest : public HllBaseTest {
  protected:
-  const std::string ids_filepath = "../data/linear_counting.dat";
   std::ifstream data_file;
 
-  LinearCountingTest() : data_file{ids_filepath, std::ifstream::in} {
-  }
+  LinearCountingTest() : HllBaseTest("linear_counting.dat"),
+    data_file{getInputPath(), std::ifstream::in} {}
 
   virtual ~LinearCountingTest() {
   }
@@ -28,14 +29,6 @@ class LinearCountingTest : public ::testing::Test {
     data_file.close();
   }
 
-  void generateNumbers(std::set<uint64_t>& s, uint32_t cardinality) {
-      std::srand(0);
-      while(s.size() < cardinality) {
-          uint64_t missing = cardinality - s.size();
-          for(uint32_t i=0; i < missing; ++i)
-              s.insert(std::rand());
-      }
-  }
 };
 
 

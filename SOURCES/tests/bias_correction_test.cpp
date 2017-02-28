@@ -4,19 +4,20 @@
 #include <set>
 #include <string>
 #include <vector>
+
+#include "base_test.hpp"
 #include "gtest/gtest.h"
 #include "bias_corrected_estimate.hpp"
 #include "hll.hpp"
 
 using namespace std;
 
-class BiasCorrectionTest : public ::testing::Test {
+class BiasCorrectionTest : public HllBaseTest {
  protected:
-  const std::string ids_filepath = "../data/bias_correction.dat";
   std::ifstream data_file;
 
-  BiasCorrectionTest() : data_file{ids_filepath, std::ifstream::in} {
-  }
+  BiasCorrectionTest() : HllBaseTest("bias_correction.dat"), 
+    data_file{getInputPath(), std::ifstream::in} {}
 
   virtual ~BiasCorrectionTest() {
   }
@@ -31,14 +32,6 @@ class BiasCorrectionTest : public ::testing::Test {
     data_file.close();
   }
 
-  void generateNumbers(std::set<uint64_t>& s, uint32_t cardinality) {
-      std::srand(0);
-      while(s.size() < cardinality) {
-          uint64_t missing = cardinality - s.size();
-          for(uint32_t i=0; i < missing; ++i)
-              s.insert(std::rand());
-      }
-  }
 
 };
 

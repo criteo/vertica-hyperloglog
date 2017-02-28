@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdint.h>
 
-
+#include "base_test.hpp"
 #include "gtest/gtest.h"
 #include "hll.hpp"
 
@@ -14,13 +14,12 @@ using namespace std;
 namespace {
 
 
-class HllTest : public ::testing::Test {
+class HllTest : public HllBaseTest {
  protected:
-  const std::string ids_filepath = "../data/ids.dat";
   std::ifstream data_file;
 
-  HllTest() : data_file{ids_filepath, std::ifstream::in} {
-  }
+  HllTest() : HllBaseTest("ids.dat"),
+    data_file{getInputPath(), std::ifstream::in} {}
 
   virtual ~HllTest() {
     // You can do clean-up work that doesn't throw exceptions here.
@@ -73,14 +72,13 @@ TEST_F(HllTest, TestSerializeDeserialize6Bits) {
 
     Hll<uint64_t> deserialized_hll(prec);
     deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_6BITS);
-
     EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
   }
 }
 
 /**
  *                **************
- *                *** 6 BITS ***
+ *                *** 5 BITS ***
  *                **************
  */
 TEST_F(HllTest, TestSerializeDeserialize5Bits) {
@@ -177,15 +175,15 @@ TEST_F(HllTest, TestSerializeDeserialize4BitsToFile) {
     uint32_t length = hll.getSynopsisSize(Format::COMPACT_4BITS);
     std::unique_ptr<char[]> byte_array(new char[length]);
     hll.serialize(byte_array.get(), Format::COMPACT_4BITS);
-    std::ofstream temp_file_out("/tmp/tmp1", std::ios::binary | std::ios::out);
+    std::ofstream temp_file_out("tmp1", std::ios::binary | std::ios::out);
     temp_file_out.write(byte_array.get(), length);
     temp_file_out.close();
 
-    std::ifstream temp_file_in("/tmp/tmp1", std::ios::binary | std::ios::in);
+    std::ifstream temp_file_in("tmp1", std::ios::binary | std::ios::in);
     std::unique_ptr<char[]> byte_array2(new char[length]);
     temp_file_in.read(byte_array2.get(), length);
     temp_file_in.close();
-    unlink("tmp");
+    unlink("tmp1");
 
     Hll<uint64_t> deserialized_hll(prec);
     deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_4BITS);

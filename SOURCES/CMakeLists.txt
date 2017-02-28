@@ -57,7 +57,7 @@ if (BUILD_TESTS)
   add_subdirectory(lib/googletest-1.7.0 EXCLUDE_FROM_ALL)
 
   enable_testing()
-
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSOURCE_PATH='\"${CMAKE_CURRENT_LIST_DIR}\"'")
   # Include the gtest library. gtest_SOURCE_DIR is available due to
   # inclusion of googletest subdirectory with another cmake file
   include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} src)

@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdint.h>
 
-
+#include "base_test.hpp"
 #include "gtest/gtest.h"
 #include "hll_raw.hpp"
 
@@ -14,13 +14,12 @@ using namespace std;
 namespace {
 
 
-class HllRawTest : public ::testing::Test {
+class HllRawTest : public HllBaseTest {
  protected:
-  const std::string ids_filepath = "../data/ids.dat";
   std::ifstream data_file;
 
-  HllRawTest() : data_file{ids_filepath, std::ifstream::in} {
-  }
+  HllRawTest() : HllBaseTest("ids.dat"),
+    data_file{getInputPath(), std::ifstream::in} {}
 
   virtual ~HllRawTest() {
     // You can do clean-up work that doesn't throw exceptions here.
