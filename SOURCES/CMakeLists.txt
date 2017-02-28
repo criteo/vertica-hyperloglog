@@ -50,8 +50,11 @@ add_test(hll_test hll_test)
 # Below we define a variable BUILD_TESTS which can be toggled e.g. with ccmake
 # It says whether the tests should be built at all
 if (BUILD_TESTS)
+
   # This adds another subdirectory, which has 'project(gtest)'.
-  add_subdirectory(lib/googletest-1.7.0)
+  # Thanks to EXCLUDE_FROM_ALL google test will not be installed
+  # when running "make install"
+  add_subdirectory(lib/googletest-1.7.0 EXCLUDE_FROM_ALL)
 
   enable_testing()
 
