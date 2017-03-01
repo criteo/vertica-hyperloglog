@@ -199,7 +199,18 @@ Byte 0   Byte 1
 
 ## Using HyperLogLog in Vertica
 
-From the Vertica's point of view a synopsis is VARBINARY. Its size depends on the number of precision bits and compactness (number of bits per bucket). The table below characterizes shows synopsis for different values of parameters.
+This repository contains implementation of two User Defined Aggregation Functions in Vertica: HllCreateSynopsis and HllDistinctCount. The former is used to aggregate input data and creates a synopsis in the format described above. These synopsis can be further aggregated to summarize unions of two or more data sets. The latter function, HllDistinctCount, is used to compute an equivalent of an SQL DISTINCT COUNT statement from the outcome of HllCreateSynopsis.
+
+Both HllDistinctCount and HllCreateSynopsis expect two parameters:
+
+  name | possible values | description
+  -----|-----------------|------------
+  hllLeadingBits | 1...16 | Number of bits used cut off from each hash value used to specify which buckets a number falls into. This parameter is inherent to the HyperLogLog algorithm. In general the higher it is, the more accurate is the HLL's estimate. Importantly, synopsis' size is exponentially proportional to this value.
+  bitsPerBucket | 4,5,6,8 | Number of bits used to put serialize synopsis in HllCreateSynopsis. Synopsis' size is proportional to this value. While bitsPerBucket={6,8} won't impact accuracy, when the value is set to 4 or 5, the accuracy might be effected, although this behaviour is unlikely. 
+
+  **It is worthwhile to note that the smaller the synopsis is, the faster the algorithm will be**. For precise numbers please refer to the `Latency and accuracy benchmarks` below. 
+
+From the Vertica's point of view a synopsis is just a VARBINARY. Its size depends on the number of precision bits and compactness (number of bits per bucket) and is fixed for these two parameters, i.e. no matter what the stored cardinality is, the synopsis will have constant size. The table below characterizes synopsis size for different values of parameters. In the rows there are different supported compactness values. In the columns there are various precision sizes (i.e. binary logarithm of number of buckets). Please note that the highest supported precision is 16 bits.
 
 | | p=10 | p=11 | p=12 | p=13 | p=14 | p=15
 --------|------|------|------|------|------|-----
@@ -219,6 +230,7 @@ Where:
 
 This representation has never been tested on a big-endian machine. Hence, it's safe to assume that it only works on little-endian machines.
 
+### Registering UDFs in Vertica
 To use our implementation of HyperLogLog we need to register the UDFs in Vertica, so that it can access them.
 ```SQL
 SET ROLE pseudosuperuser;
@@ -228,7 +240,9 @@ CREATE AGGREGATE FUNCTION HllCreateSynopsis AS LANGUAGE 'C++' NAME 'HllCreateSyn
 CREATE AGGREGATE FUNCTION HllDistinctCount AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
 ```
 
-Then, to calculate DISTINCT COUNT we first have to aggregate some data:
+### Computing DISTINCT COUNT
+
+Computation of DISTINCT COUNT using this HyperLogLog UDF constists of two steps. First we first have to aggregate some data and create a synopsis:
 
 ```SQL
 DROP TABLE test_schema.agg_clicks;
@@ -253,7 +267,7 @@ GROUP BY
   network_id;
 ```
 
-Finally, we can calculate DISTINCT COUNT based on the synopsis:
+Secondly, we can calculate DISTINCT COUNT based on the synopsis:
 
 ```SQL
 SELECT
