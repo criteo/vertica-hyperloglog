@@ -346,7 +346,7 @@ Vertica's HLL | 16? | **676** | **505** | 1181
 This project relies on cmake as the main building tool. Typically, you create a separate build directory where you run cmake and create target binaries.
 
 ```bash
-$ git clone git@gitlab.criteois.com:f.jehl/vertica-udfs.git
+$ git clone git@github.com:criteo/vertica-hyperloglog.git
 $ cd vertica-udfs
 $ mkdir build
 $ cd build
