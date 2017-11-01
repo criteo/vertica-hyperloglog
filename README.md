@@ -347,10 +347,9 @@ This project relies on cmake as the main building tool. Typically, you create a 
 
 ```bash
 $ git clone git@github.com:criteo/vertica-hyperloglog.git
-$ cd vertica-udfs
 $ mkdir build
 $ cd build
-$ cmake ..
+$ cmake ../SOURCES
 $ make
 $ file libhll.so
 libhll.so: ELF 64-bit LSB shared object, x86-64
@@ -361,7 +360,7 @@ This code comes with a handful of tests based on the Google C++ Testing Framewor
 
 ```bash
 $ cd build
-$ ccmake ..
+$ ccmake ../SOURCES
 # toggle tests to ON, then press 'c', then press 'g'
 $ make
 $ file hll_test
@@ -370,7 +369,7 @@ hll_test: ELF 64-bit LSB executable, x86-64
 ... or directly from the command line:
 ```bash
 $ cd build
-$ cmake .. -DBUILD_TESTS=1
+$ cmake ../SOURCES -DBUILD_TESTS=1
 $ make
 $ file hll_test
 hll_test: ELF 64-bit LSB executable, x86-64
@@ -380,18 +379,65 @@ hll_test: ELF 64-bit LSB executable, x86-64
 Once the tests are built, it's enough to run the output binary:
 ```
 $ ./hll_test
-[==========] Running 10 tests from 1 test case.
+[==========] Running 21 tests from 4 test cases.
 [----------] Global test environment set-up.
-[----------] 10 tests from HllTest
-[ RUN      ] HllTest.TestErrorWithinRangeForDifferentBucketMasks
-[       OK ] HllTest.TestErrorWithinRangeForDifferentBucketMasks (87 ms)
-...
+[----------] 5 tests from HllTest
+[ RUN      ] HllTest.TestSerializeDeserialize6Bits
+[       OK ] HllTest.TestSerializeDeserialize6Bits (274 ms)
+[ RUN      ] HllTest.TestSerializeDeserialize5Bits
+[       OK ] HllTest.TestSerializeDeserialize5Bits (208 ms)
+[ RUN      ] HllTest.TestSerializeDeserialize5BitsToFile
+[       OK ] HllTest.TestSerializeDeserialize5BitsToFile (218 ms)
+[ RUN      ] HllTest.TestSerializeDeserialize4BitsToFile
+[       OK ] HllTest.TestSerializeDeserialize4BitsToFile (240 ms)
+[ RUN      ] HllTest.TestWrongParametersSerializationThrowsError
+[       OK ] HllTest.TestWrongParametersSerializationThrowsError (120 ms)
+[----------] 5 tests from HllTest (1061 ms total)
 
-[----------] 10 tests from HllTest (486 ms total)
+[----------] 13 tests from HllRawTest
+[ RUN      ] HllRawTest.TestSerializeDeserialize6Bits
+[       OK ] HllRawTest.TestSerializeDeserialize6Bits (106 ms)
+[ RUN      ] HllRawTest.TestSerializeDeserialize6BitsToFile
+[       OK ] HllRawTest.TestSerializeDeserialize6BitsToFile (106 ms)
+[ RUN      ] HllRawTest.TestKnuthHash
+[       OK ] HllRawTest.TestKnuthHash (90 ms)
+[ RUN      ] HllRawTest.TestErrorWithinRangeForDifferentBucketMasks
+[       OK ] HllRawTest.TestErrorWithinRangeForDifferentBucketMasks (143 ms)
+[ RUN      ] HllRawTest.TestDummyHashFunction
+[       OK ] HllRawTest.TestDummyHashFunction (89 ms)
+[ RUN      ] HllRawTest.TestNonStandardSynopsisSize
+[       OK ] HllRawTest.TestNonStandardSynopsisSize (0 ms)
+[ RUN      ] HllRawTest.TestSynopsisAdditionAssociativity
+[       OK ] HllRawTest.TestSynopsisAdditionAssociativity (109 ms)
+[ RUN      ] HllRawTest.Test32BitHash
+[       OK ] HllRawTest.Test32BitHash (91 ms)
+[ RUN      ] HllRawTest.Test32BitIds
+[       OK ] HllRawTest.Test32BitIds (92 ms)
+[ RUN      ] HllRawTest.TestEstimateGrowsMonotonically
+[       OK ] HllRawTest.TestEstimateGrowsMonotonically (94 ms)
+[ RUN      ] HllRawTest.TestAlreadySeenItemsDontChangeEstimate
+[       OK ] HllRawTest.TestAlreadySeenItemsDontChangeEstimate (93 ms)
+[ RUN      ] HllRawTest.TestBigInput
+[       OK ] HllRawTest.TestBigInput (94 ms)
+[ RUN      ] HllRawTest.TestSmallInput
+[       OK ] HllRawTest.TestSmallInput (9 ms)
+[----------] 13 tests from HllRawTest (1118 ms total)
+
+[----------] 2 tests from BiasCorrectionTest
+[ RUN      ] BiasCorrectionTest.TestBiasCorrectionGivesBetterEstimateThanRawHLL
+[       OK ] BiasCorrectionTest.TestBiasCorrectionGivesBetterEstimateThanRawHLL (2458 ms)
+[ RUN      ] BiasCorrectionTest.TestFixedPrecisionEstimate
+[       OK ] BiasCorrectionTest.TestFixedPrecisionEstimate (332 ms)
+[----------] 2 tests from BiasCorrectionTest (2790 ms total)
+
+[----------] 1 test from LinearCountingTest
+[ RUN      ] LinearCountingTest.TestLinearCounting
+[       OK ] LinearCountingTest.TestLinearCounting (11 ms)
+[----------] 1 test from LinearCountingTest (11 ms total)
 
 [----------] Global test environment tear-down
-[==========] 10 tests from 1 test case ran. (486 ms total)
-[  PASSED  ] 10 tests.
+[==========] 21 tests from 4 test cases ran. (4981 ms total)
+[  PASSED  ] 21 tests.
 ```
 
 ### How to run the integration tests with Docker?
