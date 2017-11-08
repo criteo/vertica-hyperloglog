@@ -6,3 +6,5 @@ src/build
 tests/build
 *.swp
 *~
+vertica-sdk.tar.gz
+vertica-sdk/

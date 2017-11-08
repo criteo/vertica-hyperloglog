@@ -5,7 +5,7 @@ GREEN='\033[0;32m'
 ORANGE='\033[0;33m'
 NC='\033[0m'
 
-ITEST_DIR=/home/dbadmin/src/tests/integration
+ITEST_DIR=/home/vertica/vertica-hyperloglog/SOURCES/tests/integration/
 
 echoerr() { echo "$@" 1>&2; }
 execute() {
@@ -13,7 +13,7 @@ execute() {
 
   echoerr -n "Running $(basename ${test%.*})..."
   if [[ $filename =~ \.sql$ ]]; then
-    output=$(/opt/vertica/bin/vsql -U dbadmin -f "$filename")
+    output=$(/opt/vertica/bin/vsql -U vertica -f "$filename")
   elif [[ $filename =~ \.sh$ ]]; then
     output=$(/bin/bash "$filename")
   fi
@@ -32,14 +32,15 @@ execute() {
 echo "READY"
 
 # Waiting for the message
-read -r line
+#read -r line
 
 # Message received, run the tests
-rm -rf /home/dbadmin/build
-rm -rf /home/dbadmin/src/CMakeCache.txt
-mkdir /home/dbadmin/build && cd $_
-cmake /home/dbadmin/src -DBUILD_DATA_GEN=ON -DSDK_HOME=/opt/vertica/sdk >/dev/null
-make > /dev/null
+rm -rf /home/vertica/vertica-hyperloglog/vertica-udfs
+rm -rf /home/vertica/vertica-hyperloglog/SOURCES/CMakeCache.txt
+mkdir /home/vertica/vertica-hyperloglog/vertica-udfs && cd $_
+cmake /home/vertica/vertica-hyperloglog/SOURCES/ -DBUILD_DATA_GEN=ON -DSDK_HOME=/opt/vertica/sdk >/dev/null
+make
+chmod 777 -R /home/vertica/vertica-hyperloglog/vertica-udfs/*
 
 echoerr -e "${ORANGE}Running test suite...${NC}"
 for test in $(ls $ITEST_DIR | grep -e '[0-1][0-9]_.*\.\(sql\|sh\)' | sort)

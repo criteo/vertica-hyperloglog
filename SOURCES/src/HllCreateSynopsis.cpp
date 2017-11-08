@@ -6,7 +6,7 @@
 #include "Vertica.h"
 #include "hll.hpp"
 #include "hll_vertica.hpp"
-
+#include "stack_trace.hpp"
 
 class HllCreateSynopsis : public AggregateFunction
 {
@@ -32,6 +32,7 @@ class HllCreateSynopsis : public AggregateFunction
         HLL initialHll(hllLeadingBits);
         this -> synopsisSize = initialHll.getSynopsisSize(format);
         try {
+        srvInterface.log("====initAggregate: aggs.getStringRef(0).data(): %s\n",aggs.getStringRef(0).str().c_str());
           initialHll.serialize(aggs.getStringRef(0).data(), format);
         } catch(SerializationError& e) {
           vt_report_error(0, e.what());
@@ -60,6 +61,9 @@ class HllCreateSynopsis : public AggregateFunction
                          MultipleIntermediateAggs &aggsOther)
     {
       HLL outputHll(hllLeadingBits);
+      //print_stacktrace();
+      srvInterface.log("====combine: got hllLeadingBits: %d, format: %d\n", (int) hllLeadingBits, (int)format);
+      srvInterface.log("====combine: aggs.getStringRef(0).data(): %s\n",aggs.getStringRef(0).str().c_str());
       try {
         outputHll.deserialize(aggs.getStringRef(0).data(), format );
         do {
@@ -95,6 +99,8 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
       HLL dummy(readSubStreamBits(srvInterface));
       Format format = readSerializationFormat(srvInterface);
       intermediateTypeMetaData.addVarbinary(dummy.getSynopsisSize(format));
+      srvInterface.log("=====getIntermediateTypes======\n");
+      srvInterface.log("=====readSubStreamBits: %d == format: %d, size: %d\n",readSubStreamBits(srvInterface), format, dummy.getSynopsisSize(format));
     }
 
 
@@ -104,6 +110,7 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
     {
         argTypes.addInt();
         returnType.addVarbinary();
+        srvInterface.log("=====getPrototype======\n");
     }
 
     virtual void getReturnType(ServerInterface &srvInterface,
@@ -113,6 +120,8 @@ class HllCreateSynopsisFactory : public AggregateFunctionFactory
       HLL dummy(readSubStreamBits(srvInterface));
       Format format = readSerializationFormat(srvInterface);
       outputTypes.addVarbinary(dummy.getSynopsisSize(format));
+      srvInterface.log("=====getReturnType======\n");
+      srvInterface.log("=====readSubStreamBits: %d == format: %d, size: %d\n",readSubStreamBits(srvInterface), format, dummy.getSynopsisSize(format));
     }
 
     virtual AggregateFunction *createAggregateFunction(ServerInterface &srvInterface)
