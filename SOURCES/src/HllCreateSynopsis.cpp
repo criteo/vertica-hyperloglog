@@ -32,7 +32,10 @@ class HllCreateSynopsis : public AggregateFunction
         HLL initialHll(hllLeadingBits);
         this -> synopsisSize = initialHll.getSynopsisSize(format);
         try {
-          initialHll.serialize(aggs.getStringRef(0).data(), format);
+          VString &vs = aggs.getStringRef(0);
+          if (majorSdkVersion(VERTICA_BUILD_ID_SDK_Version) >= 8)
+            vs.alloc(this -> synopsisSize);
+          initialHll.serialize(vs.data(), format);
         } catch(SerializationError& e) {
           vt_report_error(0, e.what());
         }
