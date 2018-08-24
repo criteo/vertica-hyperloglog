@@ -47,6 +47,22 @@ public:
 
   Hll(uint8_t bucketBits) : Hll(bucketBits, bucketBits-4) {}
 
+  void fold(const uint8_t* byteArray, size_t length) {
+    HLLHdr hdr = *(reinterpret_cast<const HLLHdr*>(byteArray));
+    const uint8_t* byteArrayHll = byteArray + sizeof(HLLHdr);
+    if(hdr.format == formatToCode(Format::NORMAL)) {
+      hll.fold8Bits(byteArrayHll);
+    } else if (hdr.format == formatToCode(Format::COMPACT_6BITS)) {
+      hll.fold6Bits(byteArrayHll);
+    } else if (hdr.format == formatToCode(Format::COMPACT_5BITS)) {
+      hll.fold5BitsWithBase(byteArrayHll, hdr.bucketBase);
+    } else if (hdr.format == formatToCode(Format::COMPACT_4BITS)) {
+      hll.fold4BitsWithBase(byteArrayHll, hdr.bucketBase);
+    } else {
+      throw SerializationError("Unknown format parameter from header in fold().");
+    }
+  }
+
   void deserialize(const char* byteArray, Format format) {
     HLLHdr hdr = *(reinterpret_cast<const HLLHdr*>(byteArray));
     if(hdr.format != formatToCode(format))

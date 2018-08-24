@@ -45,9 +45,10 @@ class HllDistinctCount : public AggregateFunction
       try {
         outputHll.deserialize(aggs.getStringRef(0).data(), format);
         do {
-          HLL currentSynopsis(hllLeadingBits);
-          currentSynopsis.deserialize(argReader.getStringRef(0).data(), format);
-          outputHll.add(currentSynopsis);
+          outputHll.fold(
+            reinterpret_cast<const uint8_t*>(argReader.getStringRef(0).data()), 
+            argReader.getStringRef(0).length()
+          );
         } while (argReader.next());
         outputHll.serialize(aggs.getStringRef(0).data(), format);
       } catch(SerializationError& e) {
@@ -64,9 +65,10 @@ class HllDistinctCount : public AggregateFunction
       try {
         outputHll.deserialize(aggs.getStringRef(0).data(), format);
         do {
-          HLL currentSynopsis(hllLeadingBits);
-          currentSynopsis.deserialize(aggsOther.getStringRef(0).data(), format);
-          outputHll.add(currentSynopsis);
+          outputHll.fold(
+            reinterpret_cast<const uint8_t*>(aggsOther.getStringRef(0).data()), 
+            aggsOther.getStringRef(0).length()
+          );
         } while (aggsOther.next());
         outputHll.serialize(aggs.getStringRef(0).data(), format);
       } catch(SerializationError& e) {

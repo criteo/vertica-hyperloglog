@@ -73,6 +73,10 @@ TEST_F(HllTest, TestSerializeDeserialize6Bits) {
     Hll<uint64_t> deserialized_hll(prec);
     deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_6BITS);
     EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+
+    Hll<uint64_t> folded_hll(prec);
+    folded_hll.fold(reinterpret_cast<const uint8_t*>(byte_array.get()), length);
+    EXPECT_EQ(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct());
   }
 }
 
@@ -109,6 +113,10 @@ TEST_F(HllTest, TestSerializeDeserialize5Bits) {
     deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_5BITS);
 
     EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+
+    Hll<uint64_t> folded_hll(prec);
+    folded_hll.fold(reinterpret_cast<const uint8_t*>(byte_array.get()), length);
+    EXPECT_EQ(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct());
   }
 }
 
@@ -150,6 +158,10 @@ TEST_F(HllTest, TestSerializeDeserialize5BitsToFile) {
     deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_5BITS);
 
     EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+
+    Hll<uint64_t> folded_hll(prec);
+    folded_hll.fold(reinterpret_cast<const uint8_t*>(byte_array2.get()), length);
+    EXPECT_EQ(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct());
   }
 }
 
@@ -195,6 +207,12 @@ TEST_F(HllTest, TestSerializeDeserialize4BitsToFile) {
      */
     EXPECT_LT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()+10);
     EXPECT_GT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()-10);
+
+    Hll<uint64_t> folded_hll(prec);
+    folded_hll.fold(reinterpret_cast<const uint8_t*>(byte_array2.get()), length);
+    EXPECT_LT(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct()+10);
+    EXPECT_GT(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct()-10);
+
   }
 }
 
