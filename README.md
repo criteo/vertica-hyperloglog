@@ -1,14 +1,13 @@
 # HyperLogLog
 This repository contains C++ code of the HyperLogLog algorithm as a User Defined Function (UDF) for HP Vertica. It was created by the Scalability Analytics Platforms team at Criteo.
 
-The algorithm is implemented as two C++ UDAFs (User Defined Aggregate Function):
+The algorithm is implemented as three C++ UDAFs (User Defined Aggregate Function):
 
  - HllDistinctCount(VARBINARY)
  - HllCreateSynopsis(INT)
+ - HllCombine(VARBINARY)
 
 In the following sections we describe HyperLogLog together with the tweaks to the original algorithm, so that even someone not acquainted with the algorithm might easily get understanding of how it works.
-
-**TODO: add a "How to contribute?" section**
 
 ## Introduction
 
@@ -196,6 +195,18 @@ Byte 0   Byte 1
 +--------+--------+---//
 ```
 
+#### Sparse synopsis
+
+When the number of meaningful buckets is bellow a certain threshold, storing synopsis sparsely can reduce the IO and operations greatly.
+In the sparse format the synospsis is a list of bucket ID (2 bytes) and bucket value (1 byte), only for buckets where the values is non-zero.
+
+```
+ Byte 0   Byte 1   Byte 2  
++--------+--------+--------+---//
+|   <bucket ID>   | value  | 
++--------+--------+--------+---//
+```
+
 
 ## Using HyperLogLog in Vertica
 
@@ -238,6 +249,7 @@ DROP LIBRARY libhll CASCADE;
 CREATE LIBRARY libhll AS '/path/to/libhll.so';
 CREATE AGGREGATE FUNCTION HllCreateSynopsis AS LANGUAGE 'C++' NAME 'HllCreateSynopsisFactory' LIBRARY libhll;
 CREATE AGGREGATE FUNCTION HllDistinctCount AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
+CREATE AGGREGATE FUNCTION HllCombine AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
 ```
 
 ### Computing DISTINCT COUNT

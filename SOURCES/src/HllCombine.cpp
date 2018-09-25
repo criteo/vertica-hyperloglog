@@ -22,22 +22,26 @@ under the License.
 #include <sstream>
 #include <iostream>
 
+#include "Vertica.h"
 #include "hll.hpp"
 #include "hll_vertica.hpp"
 
-class HllDistinctCount : public AggregateFunction
+
+class HllCombine : public AggregateFunction
 {
 
   vint hllLeadingBits;
+  Format format;
 
 public:
 
   virtual void setup(ServerInterface& srvInterface, const SizedColumnTypes& argTypes) {
     this -> hllLeadingBits = readSubStreamBits(srvInterface);
+    this -> format = readSerializationFormat(srvInterface);
   }
 
   virtual void initAggregate(ServerInterface &srvInterface, IntermediateAggs &aggs)
-  {
+   {
     try
     {
       size_t maxSize = Hll<uint64_t>::getMaxDeserializedBufferSize(hllLeadingBits);
@@ -50,7 +54,7 @@ public:
       hll.reset();
     } catch (std::exception &e)
     {
-      vt_report_error(0, "Exception while initializing intermediate aggregates: [%s]", e.what());
+      vt_report_error(0, "Exception while initializing intermediate aggregates: [%s] [%d]", e.what(), hllLeadingBits);
     }
 
   }
@@ -74,7 +78,6 @@ public:
     } catch(SerializationError& e) {
       vt_report_error(0, e.what());
     }
-
   }
 
   virtual void combine(ServerInterface &srvInterface,
@@ -108,25 +111,39 @@ public:
         reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
-      resWriter.setInt(hll.approximateCountDistinct());
+      if (hll.isBetterSerializedSparse()) {
+        resWriter.getStringRef().alloc(hll.getSerializedBufferSize(Format::SPARSE));
+        hll.serialize(
+          reinterpret_cast<uint8_t *>(resWriter.getStringRef().data()),
+          Format::SPARSE
+        );
+      } else {
+        resWriter.getStringRef().alloc(hll.getSerializedBufferSize(format));
+        hll.serialize(
+          reinterpret_cast<uint8_t *>(resWriter.getStringRef().data()),
+          format
+        );
+      }
+
+      resWriter.next();
     } catch(SerializationError& e) {
       vt_report_error(0, e.what());
     }
-
   }
 
   InlineAggregate()
 };
 
 
-class HllDistinctCountFactory : public AggregateFunctionFactory
+class HllCombineFactory : public AggregateFunctionFactory
 {
+
   virtual void getIntermediateTypes(ServerInterface &srvInterface,
                                     const SizedColumnTypes &inputTypes,
                                     SizedColumnTypes &intermediateTypeMetaData)
   {
     uint8_t precision = readSubStreamBits(srvInterface);
-    intermediateTypeMetaData.addVarbinary(Hll<uint64_t>::getMaxDeserializedBufferSize(precision));
+    intermediateTypeMetaData.addVarbinary(Hll<uint64_t>::getMaxDeserializedBufferSize(precision) + sizeof(HLLHdr));
   }
 
 
@@ -135,19 +152,21 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
                             ColumnTypes &returnType)
   {
     argTypes.addVarbinary();
-    returnType.addInt();
+    returnType.addVarbinary();
   }
 
   virtual void getReturnType(ServerInterface &srvInterface,
                              const SizedColumnTypes &inputTypes,
                              SizedColumnTypes &outputTypes)
   {
-    outputTypes.addInt();
+    Format format = readSerializationFormat(srvInterface);
+    uint8_t precision = readSubStreamBits(srvInterface);
+    outputTypes.addVarbinary(Hll<uint64_t>::getMaxSerializedBufferSize(format, precision));
   }
 
   virtual AggregateFunction *createAggregateFunction(ServerInterface &srvInterface)
   {
-    return vt_createFuncObject<HllDistinctCount>(srvInterface.allocator);
+    return vt_createFuncObject<HllCombine>(srvInterface.allocator);
   }
 
   virtual void getParameterType(ServerInterface &srvInterface,
@@ -164,16 +183,6 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
     props.comment = "Serialization/deserialization bits per bucket";
     parameterTypes.addInt(HLL_BITS_PER_BUCKET_PARAMETER_NAME, props);
   }
-
 };
 
-RegisterFactory(HllDistinctCountFactory);
-RegisterLibrary("Criteo", // author
-                "", // lib_build_tag
-                "0.6", // lib_version
-                "7.2.1", // lib_sdk_version
-                "https://github.com/criteo/vertica-hyperloglog", // URL
-                "HyperLogLog implementation as User Defined Aggregate Functions", // description
-                "", // licenses required
-                "" // signature
-                );
+RegisterFactory(HllCombineFactory);
