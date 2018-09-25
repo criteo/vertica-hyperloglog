@@ -1,3 +1,22 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -35,8 +54,9 @@ class LinearCountingTest : public HllBaseTest {
 TEST_F(LinearCountingTest, TestLinearCounting) {
   std::set<uint64_t> ids;
   for(uint32_t precision=7; precision < 18; ++precision) {
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(precision); // sizeof(HLLHdr) + synopsis
     LinearCounting lc(precision);
-    HllRaw<uint64_t> hll(precision);
+    HllRaw<uint64_t> hll(precision, buffer.first.get());
 
     MurMurHash<uint64_t> hash;
 

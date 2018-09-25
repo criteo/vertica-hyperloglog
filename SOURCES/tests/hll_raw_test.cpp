@@ -1,3 +1,22 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -7,7 +26,7 @@
 
 #include "base_test.hpp"
 #include "gtest/gtest.h"
-#include "hll_raw.hpp"
+#include "hll.hpp"
 
 using namespace std;
 
@@ -39,7 +58,7 @@ class HllRawTest : public HllBaseTest {
 
 class DummyHash : public Hash<uint64_t> {
 public:
-  uint64_t operator()(uint64_t) const override {
+  uint64_t operator()(uint64_t, uint32_t) const override {
     return 0x1;
   }
 };
@@ -51,7 +70,7 @@ public:
  */
 class KnuthHash : public Hash<uint32_t> {
 public:
-  uint64_t operator()(uint32_t val) const override {
+  uint64_t operator()(uint32_t val, uint32_t seed) const override {
     uint64_t left_half  = ((static_cast<uint64_t>(val)*2654435761) % (1ULL << 32)) << 32;
     uint64_t right_half =  (static_cast<uint64_t>(val)*2654435761) % (1ULL << 32);
 
@@ -59,6 +78,32 @@ public:
   }
 };
 
+
+TEST_F(HllRawTest, TestEstimateIsCorrectForBigBuckets) {
+  const uint8_t PRECISION = 12;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer2 = Hll<uint64_t>::makeDeserializedBuffer(PRECISION);
+
+  HllRaw<uint64_t> hll(PRECISION, buffer.first.get());
+  HllRaw<uint64_t> hll2(PRECISION, buffer2.first.get());
+
+  //number of buckets is always divisible by 4
+  for(uint32_t i=0; i<hll.getNumberOfBuckets(); i+=4) {
+    hll.setBucketValue(i, 4);
+    hll.setBucketValue(i+1, 5);
+    hll.setBucketValue(i+2, 6);
+    hll.setBucketValue(i+3, 7);
+
+    hll2.setBucketValue(i, 4);
+    hll2.setBucketValue(i+1, 5);
+    hll2.setBucketValue(i+2, 6);
+    hll2.setBucketValue(i+3, 7);
+  }
+  // 32 would overflow unsigned int.
+  // This was the problem with Opera data.
+  hll2.setBucketValue(0, 32);
+  EXPECT_GE(hll2.estimate(), hll.estimate());
+}
 
 /**
  * This test checks serialization and deserialization in the 6-bits format, i.e.
@@ -68,28 +113,29 @@ public:
  * estimation and are bitwise equal.
  */
 TEST_F(HllRawTest, TestSerializeDeserialize6Bits) {
-  HllRaw<uint64_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint64_t> hll(PRECISION, buffer.first.get());
 
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
-
-  std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize6Bits(byte_array.get());
+  SizedBuffer byte_array = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_6BITS, PRECISION);
+  hll.serialize6Bits(byte_array.first.get());
   /**
    * Maybe we modify this as the codebase matures, but for the time being
    * we expect his fixed length
 
    */
-  const uint32_t ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED = 12288U;
-  EXPECT_EQ(length, ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED);
+  const uint32_t ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED_WITH_HDR = 12288U + sizeof(HLLHdr);
+  EXPECT_EQ(byte_array.second, ARRAY_LENGTH_8BYTES_BUCKETS_COMPRESSED_WITH_HDR);
 
-  HllRaw<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserialize6Bits(byte_array.get());
+  SizedBuffer buffer2 = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint64_t> deserialized_hll(PRECISION, buffer2.first.get());
+  deserialized_hll.fold6Bits(byte_array.first.get(), buffer2.second);
 
   EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
-  EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
+  EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), byte_array.second));
 }
 
 /**
@@ -97,31 +143,33 @@ TEST_F(HllRawTest, TestSerializeDeserialize6Bits) {
  * However, it saves the data in a file and then reads it back in.
  */
 TEST_F(HllRawTest, TestSerializeDeserialize6BitsToFile) {
-  HllRaw<uint64_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint64_t> hll(PRECISION, buffer.first.get());
 
   for(uint64_t id; data_file >> id;) {
     hll.add(id);
   }
 
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
-  std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize6Bits(byte_array.get());
+  SizedBuffer byte_array = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_6BITS, PRECISION);
+  hll.serialize6Bits(byte_array.first.get());
   std::ofstream temp_file_out("tmp", std::ios::binary | std::ios::out);
-  temp_file_out.write(byte_array.get(), length);
+  temp_file_out.write(reinterpret_cast<const char*>(byte_array.first.get()), byte_array.second);
   temp_file_out.close();
 
   std::ifstream temp_file_in("tmp", std::ios::binary | std::ios::in);
-  std::unique_ptr<char[]> byte_array2(new char[length]);
-  temp_file_in.read(byte_array2.get(), length);
+  SizedBuffer byte_array2 = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_6BITS, PRECISION);
+  temp_file_in.read(reinterpret_cast<char*>(byte_array2.first.get()), byte_array2.second);
   temp_file_in.close();
   unlink("tmp");
 
 
-  HllRaw<uint64_t> deserialized_hll(14);
-  deserialized_hll.deserialize6Bits(byte_array2.get());
+  SizedBuffer buffer2 = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint64_t> deserialized_hll(PRECISION, buffer2.first.get());
+  deserialized_hll.fold6Bits(byte_array.first.get(), buffer2.second);
 
   EXPECT_EQ(hll.estimate(), deserialized_hll.estimate());
-  EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), length));
+  EXPECT_TRUE( 0 == std::memcmp(hll.getCurrentSynopsis(), deserialized_hll.getCurrentSynopsis(), byte_array.second));
 }
 
 
@@ -134,7 +182,9 @@ TEST_F(HllRawTest, TestSerializeDeserialize6BitsToFile) {
  * not random or broken.
  */
 TEST_F(HllRawTest, TestKnuthHash) {
-  HllRaw<uint32_t, KnuthHash> hll(4);
+  const uint8_t PRECISION = 4;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t, KnuthHash> hll(PRECISION, buffer.first.get());
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
@@ -152,12 +202,20 @@ TEST_F(HllRawTest, TestErrorWithinRangeForDifferentBucketMasks) {
    * from 8 to 16. We store them together with the precision parameter
    * in order to be able to estimate the relative error later on.
    */
-  std::vector<std::pair<uint8_t, HllRaw<uint64_t>>> hlls = { {6, {6}},
-      {8,  {8} },
-      {10, {10}},
-      {12, {12}},
-      {14, {14}},
-      {16, {16}}
+  SizedBuffer buffer6 = Hll<uint64_t>::makeDeserializedBuffer(6); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer8 = Hll<uint64_t>::makeDeserializedBuffer(8); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer10 = Hll<uint64_t>::makeDeserializedBuffer(10); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer12 = Hll<uint64_t>::makeDeserializedBuffer(12); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer14 = Hll<uint64_t>::makeDeserializedBuffer(14); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer16 = Hll<uint64_t>::makeDeserializedBuffer(16); // sizeof(HLLHdr) + synopsis
+
+  std::vector<std::pair<uint8_t, HllRaw<uint64_t>>> hlls = {
+      {6, {6, buffer6.first.get()}},
+      {8,  {8, buffer8.first.get()} },
+      {10, {10, buffer10.first.get()}},
+      {12, {12, buffer12.first.get()}},
+      {14, {14, buffer14.first.get()}},
+      {16, {16, buffer16.first.get()}}
     };
 
   for(uint64_t id; data_file >> id;) {
@@ -186,7 +244,7 @@ TEST_F(HllRawTest, TestErrorWithinRangeForDifferentBucketMasks) {
      * 1.04/sqrt(m)
      */
     double expected_error = 1.04/std::sqrt(m);
-    double real_error = std::abs(real_cardinality-approximated_cardinality)/real_cardinality;
+    double real_error = std::fabs(real_cardinality-approximated_cardinality)/real_cardinality;
 
     EXPECT_LT(real_error, expected_error*error_tolerance);
   }
@@ -199,7 +257,9 @@ TEST_F(HllRawTest, TestErrorWithinRangeForDifferentBucketMasks) {
  * no matter how many elements will be added.
  */
 TEST_F(HllRawTest, TestDummyHashFunction) {
-  HllRaw<uint64_t, DummyHash> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint64_t, DummyHash> hll(PRECISION, buffer.first.get());
   hll.add(static_cast<uint64_t>(0));
   auto singleElementDummyCount = hll.estimate();
   for(uint32_t id; data_file >> id;) {
@@ -216,11 +276,12 @@ TEST_F(HllRawTest, TestDummyHashFunction) {
  */
 TEST_F(HllRawTest, TestNonStandardSynopsisSize) {
   for(uint8_t precision=4; precision<=18; ++precision) {
-    HllRaw<uint64_t> hll(precision);
-    ASSERT_EQ(hll.getSynopsisSize(Format::NORMAL), 1<<precision);
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(precision); // sizeof(HLLHdr) + synopsis
+    HllRaw<uint64_t> hll(precision, buffer.first.get());
+    ASSERT_EQ(hll.getSerializedSynopsisSize(Format::NORMAL), 1<<precision);
     // 6 bit format is expected to go down by 3/4
     // since 8 bits become 6
-    ASSERT_EQ(hll.getSynopsisSize(Format::COMPACT_6BITS), (1<<precision)*3/4);
+    ASSERT_EQ(hll.getSerializedSynopsisSize(Format::COMPACT_6BITS), (1<<precision)*3/4);
   }
 }
 
@@ -233,7 +294,13 @@ TEST_F(HllRawTest, TestNonStandardSynopsisSize) {
  * one HllRaw.
  */
 TEST_F(HllRawTest, TestSynopsisAdditionAssociativity) {
-  HllRaw<uint64_t> hll1(14), hll2(14), hll1plus2(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer1 = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer2 = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  SizedBuffer buffer1p2 = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+
+
+  HllRaw<uint64_t> hll1(PRECISION, buffer1.first.get()), hll2(PRECISION, buffer2.first.get()), hll1plus2(PRECISION, buffer1p2.first.get());
   std::vector<uint32_t> ids;
   ids.reserve(1000000);
   for(uint32_t id; data_file >> id;) {
@@ -259,7 +326,9 @@ TEST_F(HllRawTest, TestSynopsisAdditionAssociativity) {
  * 64 bits long, but this should work as well.
  */
 TEST_F(HllRawTest, Test32BitHash) {
-  HllRaw<uint32_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t> hll(PRECISION, buffer.first.get());
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
@@ -270,7 +339,9 @@ TEST_F(HllRawTest, Test32BitHash) {
 
 
 TEST_F(HllRawTest, Test32BitIds) {
-  HllRaw<uint32_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t> hll(PRECISION, buffer.first.get());
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
   }
@@ -286,7 +357,9 @@ TEST_F(HllRawTest, Test32BitIds) {
  * lower.
  */
 TEST_F(HllRawTest, TestEstimateGrowsMonotonically) {
-  HllRaw<uint64_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t> hll(PRECISION, buffer.first.get());
 
   uint32_t counter = 0;
   uint64_t prevEstimate = 0;
@@ -310,7 +383,9 @@ TEST_F(HllRawTest, TestEstimateGrowsMonotonically) {
  * already seen value will not change it.
  */
 TEST_F(HllRawTest, TestAlreadySeenItemsDontChangeEstimate) {
-  HllRaw<uint64_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t> hll(PRECISION, buffer.first.get());
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
@@ -334,7 +409,9 @@ TEST_F(HllRawTest, TestAlreadySeenItemsDontChangeEstimate) {
  * within 1% from the real value.
  */
 TEST_F(HllRawTest, TestBigInput) {
-  HllRaw<uint64_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t> hll(PRECISION, buffer.first.get());
 
   for(uint32_t id; data_file >> id;) {
     hll.add(id);
@@ -347,7 +424,9 @@ TEST_F(HllRawTest, TestBigInput) {
 
 
 TEST_F(HllRawTest, TestSmallInput) {
-  HllRaw<uint64_t> hll(14);
+  const uint8_t PRECISION = 14;
+  SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(PRECISION); // sizeof(HLLHdr) + synopsis
+  HllRaw<uint32_t> hll(PRECISION, buffer.first.get());
 
   size_t i=0;
   for(uint32_t id; data_file >> id && i < 100000; ++i) {

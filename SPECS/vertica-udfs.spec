@@ -43,6 +43,7 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(755, root, root, 755)
 /opt/vertica/lib/libhll.so
+/opt/vertica/lib/libhlldruid.so
 
 %check
 make check # this runs the unit tests

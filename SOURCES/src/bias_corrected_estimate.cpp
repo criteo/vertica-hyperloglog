@@ -1,9 +1,32 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 #include <algorithm>
 #include <cassert>
 #include <iostream>
 #include <vector>
 #include "bias_corrected_estimate.hpp"
+#include <cmath>
 
+#ifdef HIVE_BUILD
+asm (".symver memcpy, memcpy@GLIBC_2.2.5");
+#endif
 
 /**
  * Like in the Google paper we use a 6-neighbours interpolation. The algorithm goes as follows:
@@ -18,16 +41,29 @@ double BiasCorrectedEstimate::kNeighborsInterpolationBias(uint64_t rawEstimate, 
 
   // lower_bound returns an iterator pointing to the first element that is not smaller
   auto lower = std::lower_bound(rawEstimates.begin(), rawEstimates.end(), rawEstimate);
-  // lowerBoundIdx keep index of the 
-  auto lowerBoundIdx = lower-rawEstimates.begin();
+  uint32_t lowerBoundIdx;
+  if(lower == rawEstimates.end()) {
+    // this branch is taken when in the rawEstimates array there is no smaller element than rawEstimate
+    // i.e. rawEstimate is greater than the greatest element, but still below the bias correction threshold
+    // (otherwise the function wouldn't be called)
+    //
+    // For instance for p=12, (then m=4096 and threshold=20480) the highest number in the array is 20463.22, meaning
+    // that every number between (20463.22, 20480) would cause that lower_bound() returns end().
+    lowerBoundIdx = static_cast<uint32_t>(lower-rawEstimates.begin()-1);
+
+  } else {
+    // lowerBoundIdx keeps the index of the lower bound element
+    lowerBoundIdx = static_cast<uint32_t>(lower-rawEstimates.begin());
+  }
+
 
   // in this vector we put neighbors from left and right
   // and then we sort them by the distance from rawEstimate
   std::vector<std::pair<uint32_t, double>> neighbors;
-  for(uint32_t idx = lowerBoundIdx; idx < lowerBoundIdx+6; ++idx)
-    neighbors.push_back(std::make_pair(idx, std::abs(rawEstimates[idx]-rawEstimate)));
-  for(int32_t idx = lowerBoundIdx-1; idx >= 0 && idx >= lowerBoundIdx-6; --idx) {
-    neighbors.push_back(std::make_pair(idx, std::abs(rawEstimates[idx]-rawEstimate)));
+  for(uint32_t idx = lowerBoundIdx; idx < rawEstimates.size() && idx < lowerBoundIdx+6; ++idx)
+    neighbors.push_back(std::make_pair(idx, std::fabs(rawEstimates[idx]-rawEstimate)));
+  for(int32_t idx = lowerBoundIdx-1; idx >= 0 && idx >= (int)lowerBoundIdx-6; --idx) {
+    neighbors.push_back(std::make_pair(idx, std::fabs(rawEstimates[idx]-rawEstimate)));
   }
 
   // sort pairs (idx, distanceFromHllEstimate) according to the second value
@@ -38,25 +74,30 @@ double BiasCorrectedEstimate::kNeighborsInterpolationBias(uint64_t rawEstimate, 
 
   double mean = .0;
 
-  // sum up biases for 6 closest neighbors 
+  // sum up biases for 6 closest neighbors
   for(uint32_t idx = 0; idx < 6; ++idx) {
     auto neighborIdx = neighbors[idx].first;
     mean += biases[neighborIdx];
   }
-
   return mean/6;
 }
 
 
-/** 
+/**
  * This function yields a bias-corrected estimate based on raw HLL estimate.
  * This is achieved by subtracting bias as measured by the Google guys
- * 
+ *
  * See: https://docs.google.com/document/d/1gyjfMHy43U9OWBXxfaeG-3MjGzejW1dlpyMwEYAAWEI/
  */
 uint64_t BiasCorrectedEstimate::estimate(uint64_t rawEstimate, uint8_t precision) {
   assert(precision >= 4 && precision <= 18);
-  return rawEstimate - kNeighborsInterpolationBias(rawEstimate, precision);
+  auto bias = kNeighborsInterpolationBias(rawEstimate, precision);
+  uint64_t correctedValue;
+  if(rawEstimate > bias)
+    correctedValue = rawEstimate - kNeighborsInterpolationBias(rawEstimate, precision);
+  else
+    correctedValue = 0;
+  return correctedValue;
 }
 
 const std::vector<std::vector<double>> BiasCorrectedEstimate::rawEstimateData = {

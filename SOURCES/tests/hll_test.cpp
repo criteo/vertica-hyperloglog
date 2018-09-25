@@ -1,3 +1,22 @@
+/*
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
 #include <cmath>
 #include <fstream>
 #include <iostream>
@@ -37,6 +56,7 @@ class HllTest : public HllBaseTest {
 
 };
 
+
 /**
  *                **************
  *                *** 6 BITS ***
@@ -53,26 +73,26 @@ TEST_F(HllTest, TestSerializeDeserialize6Bits) {
   }
 
   for(uint8_t prec = 10; prec <= 18; ++prec) {
-    Hll<uint64_t> hll(prec);
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> hll(prec, buffer.first.get());
 
     for(uint64_t id: ids) {
       hll.add(id);
     }
-    uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
-
-    std::unique_ptr<char[]> byte_array(new char[length]);
-    hll.serialize(byte_array.get(), Format::COMPACT_6BITS);
+    SizedBuffer byte_array = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_6BITS, prec);
+    hll.serialize(byte_array.first.get(), Format::COMPACT_6BITS);
     /**
      * Maybe we modify this as the codebase matures, but for the time being
      * we expect his fixed length
 
      */
     const uint32_t ARRAY_LENGTH_6BYTES_BUCKETS_COMPRESSED_WITH_HDR = ((1<<prec)*6/8)+8;
-    EXPECT_EQ(length, ARRAY_LENGTH_6BYTES_BUCKETS_COMPRESSED_WITH_HDR);
+    EXPECT_EQ(byte_array.second, ARRAY_LENGTH_6BYTES_BUCKETS_COMPRESSED_WITH_HDR);
 
-    Hll<uint64_t> deserialized_hll(prec);
-    deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_6BITS);
-    EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+    SizedBuffer bufferFolded = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> folded_hll(prec, bufferFolded.first.get());
+    folded_hll.fold(byte_array.first.get(), byte_array.second);
+    EXPECT_EQ(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct());
   }
 }
 
@@ -88,27 +108,26 @@ TEST_F(HllTest, TestSerializeDeserialize5Bits) {
   }
 
   for(uint8_t prec = 10; prec <= 18; ++prec) {
-    Hll<uint64_t> hll(prec);
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> hll(prec, buffer.first.get());
 
     for(uint64_t id: ids) {
       hll.add(id);
     }
-    uint32_t length = hll.getSynopsisSize(Format::COMPACT_5BITS);
-
-    std::unique_ptr<char[]> byte_array(new char[length]);
-    hll.serialize(byte_array.get(), Format::COMPACT_5BITS);
+    SizedBuffer byte_array = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_5BITS, prec);
+    hll.serialize(byte_array.first.get(), Format::COMPACT_5BITS);
     /**
      * Maybe we modify this as the codebase matures, but for the time being
      * we expect his fixed length
 
      */
     const uint32_t ARRAY_LENGTH_5BYTES_BUCKETS_COMPRESSED_WITH_HDR = ((1<<prec)*5/8)+8;
-    EXPECT_EQ(length, ARRAY_LENGTH_5BYTES_BUCKETS_COMPRESSED_WITH_HDR);
+    EXPECT_EQ(byte_array.second, ARRAY_LENGTH_5BYTES_BUCKETS_COMPRESSED_WITH_HDR);
 
-    Hll<uint64_t> deserialized_hll(prec);
-    deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_5BITS);
-
-    EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+    SizedBuffer bufferFolded = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> folded_hll(prec, bufferFolded.first.get());
+    folded_hll.fold(byte_array.first.get(), byte_array.second);
+    EXPECT_EQ(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct());
   }
 }
 
@@ -127,29 +146,29 @@ TEST_F(HllTest, TestSerializeDeserialize5BitsToFile) {
   }
 
   for(uint8_t prec = 10; prec <= 18; ++prec) {
-    Hll<uint64_t> hll(prec);
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> hll(prec, buffer.first.get());
 
     for(uint64_t id: ids) {
       hll.add(id);
     }
 
-    uint32_t length = hll.getSynopsisSize(Format::COMPACT_5BITS);
-    std::unique_ptr<char[]> byte_array(new char[length]);
-    hll.serialize(byte_array.get(), Format::COMPACT_5BITS);
+    SizedBuffer byte_array = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_5BITS, prec);
+    hll.serialize(byte_array.first.get(), Format::COMPACT_5BITS);
     std::ofstream temp_file_out("/tmp/tmp1", std::ios::binary | std::ios::out);
-    temp_file_out.write(byte_array.get(), length);
+    temp_file_out.write(reinterpret_cast<const char*>(byte_array.first.get()), byte_array.second);
     temp_file_out.close();
 
     std::ifstream temp_file_in("/tmp/tmp1", std::ios::binary | std::ios::in);
-    std::unique_ptr<char[]> byte_array2(new char[length]);
-    temp_file_in.read(byte_array2.get(), length);
+    SizedBuffer byte_array2 = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_5BITS, prec);
+    temp_file_in.read(reinterpret_cast<char*>(byte_array2.first.get()), byte_array2.second);
     temp_file_in.close();
     unlink("tmp");
 
-    Hll<uint64_t> deserialized_hll(prec);
-    deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_5BITS);
-
-    EXPECT_EQ(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct());
+    SizedBuffer bufferFolded = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> folded_hll(prec, bufferFolded.first.get());
+    folded_hll.fold(byte_array2.first.get(), byte_array2.second);
+    EXPECT_EQ(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct());
   }
 }
 
@@ -166,57 +185,77 @@ TEST_F(HllTest, TestSerializeDeserialize4BitsToFile) {
   }
 
   for(uint8_t prec = 10; prec <= 18; ++prec) {
-    Hll<uint64_t> hll(prec);
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> hll(prec, buffer.first.get());
 
     for(uint64_t id: ids) {
       hll.add(id);
     }
 
-    uint32_t length = hll.getSynopsisSize(Format::COMPACT_4BITS);
-    std::unique_ptr<char[]> byte_array(new char[length]);
-    hll.serialize(byte_array.get(), Format::COMPACT_4BITS);
+    SizedBuffer byte_array = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_4BITS, prec);
+    hll.serialize(byte_array.first.get(), Format::COMPACT_4BITS);
     std::ofstream temp_file_out("tmp1", std::ios::binary | std::ios::out);
-    temp_file_out.write(byte_array.get(), length);
+    temp_file_out.write(reinterpret_cast<const char*>(byte_array.first.get()), byte_array.second);
     temp_file_out.close();
 
-    std::ifstream temp_file_in("tmp1", std::ios::binary | std::ios::in);
-    std::unique_ptr<char[]> byte_array2(new char[length]);
-    temp_file_in.read(byte_array2.get(), length);
+    std::ifstream temp_file_in("tmp1", std::ios::binary | std::ios::in);;
+    SizedBuffer byte_array2 = Hll<uint64_t>::makeSerializedBuffer(Format::COMPACT_4BITS, prec);
+    temp_file_in.read(reinterpret_cast<char*>(byte_array2.first.get()), byte_array2.second);
     temp_file_in.close();
     unlink("tmp1");
-
-    Hll<uint64_t> deserialized_hll(prec);
-    deserialized_hll.deserialize(byte_array2.get(), Format::COMPACT_4BITS);
 
     /**
      * With 4 bits we really experience bucket clipping.
      * To somehow take this this into account, we expect the ser/deserialized estimate
      * to be off my 10 from the original one.
      */
-    EXPECT_LT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()+10);
-    EXPECT_GT(hll.approximateCountDistinct(), deserialized_hll.approximateCountDistinct()-10);
+    SizedBuffer bufferFolded = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> folded_hll(prec, bufferFolded.first.get());
+    folded_hll.fold(byte_array2.first.get(), byte_array2.second);
+    EXPECT_LT(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct()+10);
+    EXPECT_GT(hll.approximateCountDistinct(), folded_hll.approximateCountDistinct()-10);
   }
 }
 
-
-TEST_F(HllTest, TestWrongParametersSerializationThrowsError) {
-  Hll<uint64_t> hll(14);
-
+/**
+ * Test approximate count is working properly
+ *
+ * For supported precisions of 14 and over (currently up to 18)
+ * and a set of unique elsments - verify that LogLog-Beta and
+ * LogLog++ return estimations within 1% of target
+ **/
+TEST_F(HllTest, TestApproximateCounts) {
+  const std::vector<size_t> testCardinalities = {100, 200, 1000, 100000, 500000};
+  const double expectedMaxError = 0.01; // For precisions of 14 or higher we expect error to stay within 1% of real cardinality
+  std::set<uint64_t> ids;
   for(uint64_t id; data_file >> id;) {
-    hll.add(id);
+    ids.insert(id);
   }
 
-  uint32_t length = hll.getSynopsisSize(Format::COMPACT_6BITS);
-  std::unique_ptr<char[]> byte_array(new char[length]);
-  hll.serialize(byte_array.get(), Format::COMPACT_6BITS);
+  size_t availableIds = ids.size();
+  EXPECT_GT(availableIds, 500000); // we have enough unique IDs in the file ()
 
-  Hll<uint64_t> deserialized_hll(14);
-  // NOTE: serialization was done using 6 bits, here we use 5
-  // this is an incorrect usage and should throw an erro
-  ASSERT_THROW(deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_5BITS), SerializationError);
+  for(uint8_t prec = 14; prec <= 18; ++prec) {
+    SizedBuffer buffer = Hll<uint64_t>::makeDeserializedBuffer(prec);
+    Hll<uint64_t> hll(prec, buffer.first.get());
+    for (size_t nCard = 0; nCard < testCardinalities.size(); ++nCard) {
+      size_t itemsAdded = 0;
+      uint64_t expectedMinimum = static_cast<uint64_t>( (1.0 - expectedMaxError) * testCardinalities[nCard]);
+      uint64_t expectedMaximum = static_cast<uint64_t>( (1.0 + expectedMaxError) * testCardinalities[nCard]);
+      for(uint64_t id: ids) {
+        if (itemsAdded++ < testCardinalities[nCard]) {
+          hll.add(id);
+        } else {
+          break;
+        }
+      }
 
-  // this usage is legit, as the synopsis was serialized using 6 bits per bucket
-  ASSERT_NO_THROW(deserialized_hll.deserialize(byte_array.get(), Format::COMPACT_6BITS));
+      EXPECT_GT(hll.approximateCountDistinct(), expectedMinimum);
+      EXPECT_LT(hll.approximateCountDistinct(), expectedMaximum);
+      EXPECT_GT(hll.approximateCountDistinct_beta(), expectedMinimum);
+      EXPECT_LT(hll.approximateCountDistinct_beta(), expectedMaximum);
+    }
+  }
 }
 
 } // namespace
