@@ -1,5 +1,5 @@
 Vertica HyperLogLog
 Copyright 2018 Criteo
 
-This product includes software developed at
-The Apache Software Foundation (http://www.apache.org/).
+This product includes derivated work based on the HyperLogLog implementation of Apache Druid
+https://github.com/apache/incubator-druid
