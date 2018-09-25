@@ -9,6 +9,12 @@ The algorithm is implemented as three C++ UDAFs (User Defined Aggregate Function
 
 In the following sections we describe HyperLogLog together with the tweaks to the original algorithm, so that even someone not acquainted with the algorithm might easily get understanding of how it works.
 
+The repository also contains three C++ UDAFS using a variant of HyperLogLog compatible with the Druid implementation, allowing to consume/create HyperLogLog from/to Druid
+
+ - HllDruidDistinctCount(VARBINARY)
+ - HllDruidCreateSynopsis(INT)
+ - HllDruidCombine(VARBINARY)
+
 ## Introduction
 
 HyperLogLog is an algorithm used for estimating cardinality of a multiset. Multiset is a bag values which don't have to unique. There might be repetitions in a mulitset, meaning that the total number of elements might be different from the number of unique elements.
@@ -250,6 +256,16 @@ CREATE LIBRARY libhll AS '/path/to/libhll.so';
 CREATE AGGREGATE FUNCTION HllCreateSynopsis AS LANGUAGE 'C++' NAME 'HllCreateSynopsisFactory' LIBRARY libhll;
 CREATE AGGREGATE FUNCTION HllDistinctCount AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
 CREATE AGGREGATE FUNCTION HllCombine AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
+```
+
+To use Druid implementation of HyperLogLog we need to register the UDFs in Vertica this way.
+```SQL
+SET ROLE pseudosuperuser;
+DROP LIBRARY libhll CASCADE;
+CREATE LIBRARY libhlldruid AS '/path/to/libhlldruid.so';
+CREATE AGGREGATE FUNCTION HllDruidCreateSynopsis AS LANGUAGE 'C++' NAME 'HllDruidCreateSynopsisFactory' LIBRARY libhlldruid;
+CREATE AGGREGATE FUNCTION HllDruidDistinctCount AS LANGUAGE 'C++' NAME 'HllDruidDistinctCountFactory' LIBRARY libhlldruid;
+CREATE AGGREGATE FUNCTION HllDruidCombine AS LANGUAGE 'C++' NAME 'HllDruidDistinctCountFactory' LIBRARY libhlldruid;
 ```
 
 ### Computing DISTINCT COUNT
