@@ -255,7 +255,7 @@ DROP LIBRARY libhll CASCADE;
 CREATE LIBRARY libhll AS '/path/to/libhll.so';
 CREATE AGGREGATE FUNCTION HllCreateSynopsis AS LANGUAGE 'C++' NAME 'HllCreateSynopsisFactory' LIBRARY libhll;
 CREATE AGGREGATE FUNCTION HllDistinctCount AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
-CREATE AGGREGATE FUNCTION HllCombine AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
+CREATE AGGREGATE FUNCTION HllCombine AS LANGUAGE 'C++' NAME 'HllCombineFactory' LIBRARY libhll;
 ```
 
 To use Druid implementation of HyperLogLog we need to register the UDFs in Vertica this way.
@@ -265,7 +265,7 @@ DROP LIBRARY libhll CASCADE;
 CREATE LIBRARY libhlldruid AS '/path/to/libhlldruid.so';
 CREATE AGGREGATE FUNCTION HllDruidCreateSynopsis AS LANGUAGE 'C++' NAME 'HllDruidCreateSynopsisFactory' LIBRARY libhlldruid;
 CREATE AGGREGATE FUNCTION HllDruidDistinctCount AS LANGUAGE 'C++' NAME 'HllDruidDistinctCountFactory' LIBRARY libhlldruid;
-CREATE AGGREGATE FUNCTION HllDruidCombine AS LANGUAGE 'C++' NAME 'HllDruidDistinctCountFactory' LIBRARY libhlldruid;
+CREATE AGGREGATE FUNCTION HllDruidCombine AS LANGUAGE 'C++' NAME 'HllDruidCombineFactory' LIBRARY libhlldruid;
 ```
 
 ### Computing DISTINCT COUNT
