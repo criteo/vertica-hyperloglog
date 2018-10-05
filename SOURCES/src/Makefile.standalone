@@ -1,0 +1,16 @@
+OBJS:=bias_corrected_estimate.o linear_counting.o  murmur3_hash.o
+CXXFLAGS:=-Ofast -I../include/
+
+all: $(OBJS)
+	ar rcs ../lib/libverticahll.a $(OBJS) 
+
+.o: .cpp
+
+clean:
+	rm -f $(OBJS) ../lib/libverticahll.a
+
+.PHONY: clean prepare
+
+
+
+
