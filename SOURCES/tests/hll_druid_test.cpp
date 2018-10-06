@@ -104,4 +104,29 @@ TEST_F(HllDruidTest, TestApproximateCounts) {
   }
 }
 
+TEST_F(HllDruidTest, TestSerializeSparse)
+{
+  unsigned char bufferDruid[1031] = {0};
+  HllDruid hll = HllDruid::wrapRawBuffer(bufferDruid, sizeof(bufferDruid) / sizeof(char));
+  hll.reset();
+
+  EXPECT_EQ(hll.approximateCountDistinct(), 0);
+
+  unsigned char synop[] = {0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  hll.fold(synop, sizeof(synop) / sizeof(char));
+  for (int i = 240; i < 440; i+=2) {
+    hll.add<uint64_t>(i);
+    unsigned char sparseBufferDruid[1031] = {0};
+    size_t sparseLength = 0;
+    hll.serialize(sparseBufferDruid, sparseLength);
+
+    unsigned char otherBufferDruid[1031] = {0};
+    HllDruid hll2 = HllDruid::wrapRawBuffer(otherBufferDruid, sizeof(otherBufferDruid) / sizeof(char));
+    hll2.reset();
+    hll2.fold(sparseBufferDruid, sparseLength);
+
+    EXPECT_EQ(hll.approximateCountDistinct(), hll2.approximateCountDistinct());
+  }
+}
+
 } // namespace
