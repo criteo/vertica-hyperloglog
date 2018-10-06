@@ -51,11 +51,10 @@ public:
     try
     {
       HllDruid hll = HllDruid::wrapRawBuffer(
-          reinterpret_cast<std::uint8_t *>(aggs.getStringRef(0).data()),
-          aggs.getTypeMetaData().getColumnType(0).getStringLength());
+          reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
+          aggs.getStringRef(0).length());
       do
       {
-
         hll.fold(
             reinterpret_cast<const uint8_t *>(argReader.getStringRef(0).data()),
             argReader.getStringRef(0).length());
@@ -74,8 +73,8 @@ public:
     try
     {
       HllDruid hll = HllDruid::wrapRawBuffer(
-          reinterpret_cast<std::uint8_t *>(aggs.getStringRef(0).data()),
-          aggs.getTypeMetaData().getColumnType(0).getStringLength());
+          reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
+          aggs.getStringRef(0).length());
       do
       {
         hll.fold(
@@ -88,6 +87,7 @@ public:
       vt_report_error(0, "Exception while combining intermediates: [%s]", e.what());
     }
   }
+
   virtual void terminate(ServerInterface &srvInterface,
                          BlockWriter &resWriter,
                          IntermediateAggs &aggs)

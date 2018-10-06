@@ -60,7 +60,7 @@ public:
     {
       HllDruid hll = HllDruid::wrapRawBuffer(
           reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
-          aggs.getTypeMetaData().getColumnType(0).getStringLength());
+          aggs.getStringRef(0).length());
       do
       {
         hll.fold(
@@ -70,7 +70,7 @@ public:
     }
     catch (std::exception &e)
     {
-      vt_report_error(0, "Exception while aggregating intermediates: [%s]", e.what());
+      vt_report_error(0, "Exception while aggregating intermediates: [%d]", e.what());
     }
   }
 
@@ -82,7 +82,7 @@ public:
     {
       HllDruid hll = HllDruid::wrapRawBuffer(
           reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
-          aggs.getTypeMetaData().getColumnType(0).getStringLength());
+          aggs.getStringRef(0).length());
       do
       {
         hll.fold(
