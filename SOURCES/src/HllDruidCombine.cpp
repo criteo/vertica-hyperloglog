@@ -70,7 +70,7 @@ public:
     }
     catch (std::exception &e)
     {
-      vt_report_error(0, "Exception while aggregating intermediates: [%d]", e.what());
+      vt_report_error(0, "Exception while aggregating intermediates: [%s]", e.what());
     }
   }
 
