@@ -201,12 +201,12 @@ void HllDruid::serialize(uint8_t *outBuffer, size_t &outLength)
   { // store sparsely;
     memcpy(outBuffer, payload, sizeof(Header));
     outLength = NUM_HEADER_BYTES;
-    for (int i = 0; i < NUM_BYTES_FOR_BUCKETS; ++i)
+    for (uint16_t i = 0; i < NUM_BYTES_FOR_BUCKETS; ++i)
     {
       if (payload[i + NUM_HEADER_BYTES] != 0)
       {
-        *(outBuffer + outLength + 0) = (i >> 8);
-        *(outBuffer + outLength + 1) = (i & 0x00ff);
+        *(outBuffer + outLength + 0) = ((i + NUM_HEADER_BYTES) >> 8);
+        *(outBuffer + outLength + 1) = ((i + NUM_HEADER_BYTES) & 0x00ff);
         *(outBuffer + outLength + 2) = payload[i + NUM_HEADER_BYTES];
         outLength += 3;
       }
