@@ -102,8 +102,10 @@ public:
 
     uint8_t* byteArrayHll = byteArray + sizeof(HLLHdr);
     uint8_t base = 0;
+    uint16_t bucketSparseCount = 0;
+
     if (format == Format::SPARSE) {
-      hdr.bucketSparseCount = hll.serialize8BitsSparse(byteArrayHll);
+      bucketSparseCount = hll.serialize8BitsSparse(byteArrayHll);
     } else if(format == Format::NORMAL) {
       hll.serialize8Bits(byteArrayHll);
     } else if (format == Format::COMPACT_6BITS) {
@@ -116,6 +118,7 @@ public:
       throw SerializationError("Unknown format parameter in serialize().");
     }
     // serialize the header as well
+    hdr.bucketSparseCount = bucketSparseCount;
     hdr.bucketBase = base;
     hdr.format = formatToCode(format);
     *reinterpret_cast<HLLHdr*>(byteArray) = hdr;
