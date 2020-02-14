@@ -10,7 +10,7 @@ project(${PROJECT_NAME})
 
 option(VEC_REPORT "Display compilation vectorization reports." OFF)
 option(DEBUG_BUILD "Attach debug information to the executables." OFF)
-option(BUILD_VERTICA_LIB "Build the .so library with UDFs for Vertica" OFF)
+option(BUILD_VERTICA_LIB "Build the .so library with UDFs for Vertica" ON)
 option(BUILD_HIVE_LIB "Build the .so library with Hive-friendly interface" OFF)
 option(BUILD_VERTICA_TEST_DRIVER "Build a test program to show basic functionality of the underlying HLL algorithm" OFF)
 option(BUILD_DATA_GEN "Build data generator for functional tests in Vertica" OFF)
@@ -46,26 +46,26 @@ if (BUILD_VERTICA_LIB)
   endif()
 
   # Here we add all source files to appear in libhll.so
-  set(SOURCES src/bias_corrected_estimate.cpp src/linear_counting.cpp
-  ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp src/hll_vertica.cpp)
-  add_library(hll SHARED ${SOURCES} src/HllCombine.cpp src/HllDistinctCount.cpp src/HllCreateSynopsis.cpp)
-  add_library(loglogbeta SHARED ${SOURCES} src/LogLogBetaDistinctCount.cpp)
-  add_library(hlldruid SHARED ${SOURCES} src/hll_druid.cpp src/HllDruidCombine.cpp src/HllDruidCreateSynopsis.cpp src/HllDruidDistinctCount.cpp src/murmur3_hash.cpp)
+  set(VERTICA_SRC ${VERTICA_INCLUDE}/Vertica.h ${VERTICA_INCLUDE}/BuildInfo.h ${VERTICA_INCLUDE}/Vertica.cpp)
+
+  set(HLL_SRC ${VERTICA_SRC} src/hll-criteo/bias_corrected_estimate.cpp src/hll-criteo/linear_counting.cpp src/hll-criteo/hll_vertica.cpp)
+
+  add_library(hll SHARED ${HLL_SRC} src/hll-criteo/HllCombine.cpp src/hll-criteo/HllDistinctCount.cpp src/hll-criteo/HllCreateSynopsis.cpp)
+  add_library(loglogbeta SHARED ${HLL_SRC} src/hll-criteo/LogLogBetaDistinctCount.cpp)
   set_target_properties(hll PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
   set_target_properties(loglogbeta PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-  set_target_properties(hlldruid PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
   # Installation process just copies the binary HLL to Vertica lib folder
   set(LIB_DIR /opt/vertica/lib)
   install(
-    TARGETS hll loglogbeta hlldruid
+    TARGETS hll loglogbeta
     DESTINATION ${LIB_DIR}
     PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
   )
 endif()
 
 if (BUILD_HIVE_LIB)
-  set(SOURCES src/bias_corrected_estimate.cpp src/linear_counting.cpp src/HllJava.cpp)
+  set(SOURCES src/hll-criteo/bias_corrected_estimate.cpp src/hll-criteo/linear_counting.cpp src/hll-criteo/HllJava.cpp)
   # define HIVE_BUILD macro to compile the code without any call to glib's memcpy. This is to avoid troubles when using
   # HLL's code through JNA. We will make use of this macro in the following way:
   # #ifdef HIVE_BUILD
@@ -85,12 +85,11 @@ if (BUILD_HIVE_LIB)
 endif()
 
 if (BUILD_VERTICA_TEST_DRIVER)
-  add_executable(hll_driver tests/hll_driver.cpp src/bias_corrected_estimate.cpp src/linear_counting.cpp )
-  add_executable(hll_druid_driver tests/hll_druid_driver.cpp src/hll_druid.cpp src/murmur3_hash.cpp)
+  add_executable(hll_driver tests/hll-criteo/hll_driver.cpp src/hll-criteo/bias_corrected_estimate.cpp src/hll-criteo/linear_counting.cpp )
 endif()
 
 if (BUILD_DATA_GEN)
-  add_executable(data_gen tests/data_gen.cpp)
+  add_executable(data_gen tests/hll-criteo/data_gen.cpp)
 endif()
 
 add_custom_target(check COMMAND ctest -V)
@@ -110,7 +109,7 @@ if (BUILD_TESTS)
 
   # Linking to Hll.cpp. We can't link to libhll.so, because there would
   # be some symbols missing, e.g. Vertica::dummy()
-  add_executable(hll_test tests/hll_druid_test.cpp tests/hll_test.cpp tests/hll_raw_test.cpp tests/bias_correction_test.cpp tests/linear_counting_test.cpp src/linear_counting.cpp src/bias_corrected_estimate.cpp src/hll_druid.cpp src/murmur3_hash.cpp)
+  add_executable(hll_test tests/hll-criteo/hll_test.cpp tests/hll-criteo/hll_raw_test.cpp tests/hll-criteo/bias_correction_test.cpp tests/hll-criteo/linear_counting_test.cpp src/hll-criteo/linear_counting.cpp src/hll-criteo/bias_corrected_estimate.cpp)
   add_dependencies(check hll_test)
   # Standard linking to googletest stuff.
   target_link_libraries(hll_test gtest gtest_main)
@@ -122,6 +121,6 @@ endif()
 
 if (BUILD_BENCHMARK)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSOURCE_PATH='\"${CMAKE_CURRENT_LIST_DIR}\"'")
-  add_executable(hll_benchmark tests/hll_benchmark.cpp src/linear_counting.cpp src/bias_corrected_estimate.cpp)
+  add_executable(hll_benchmark tests/hll-criteo/hll_benchmark.cpp src/hll-criteo/linear_counting.cpp src/hll-criteo/bias_corrected_estimate.cpp)
   add_dependencies(check hll_benchmark)
 endif()

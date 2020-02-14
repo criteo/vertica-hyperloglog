@@ -1,5 +1,5 @@
 # HyperLogLog
-This repository contains C++ code of the HyperLogLog algorithm as a User Defined Function (UDF) for HP Vertica. It was created by the Scalability Analytics Platforms team at Criteo.
+This repository contains C++ code of the HyperLogLog algorithm as a User Defined Function (UDF) for HP Vertica. It was created by the Analytics Infrastructure team at Criteo.
 
 The algorithm is implemented as three C++ UDAFs (User Defined Aggregate Function):
 
@@ -8,12 +8,6 @@ The algorithm is implemented as three C++ UDAFs (User Defined Aggregate Function
  - HllCombine(VARBINARY)
 
 In the following sections we describe HyperLogLog together with the tweaks to the original algorithm, so that even someone not acquainted with the algorithm might easily get understanding of how it works.
-
-The repository also contains three C++ UDAFS using a variant of HyperLogLog compatible with the Druid implementation, allowing to consume/create HyperLogLog from/to Druid
-
- - HllDruidDistinctCount(VARBINARY)
- - HllDruidCreateSynopsis(INT)
- - HllDruidCombine(VARBINARY)
 
 ## Introduction
 
@@ -153,7 +147,7 @@ Likewise, to serialize the buckets, we iterate over groups of 4 buckets which ge
 We lay out the compacted buckets in memory as follows.
 
 ```
- Byte 0   Byte 1   Byte 2  
+ Byte 0   Byte 1   Byte 2
 +--------+--------+--------+---//
 |00000011|11112222|22333333|4444
 +--------+--------+--------+---//
@@ -207,9 +201,9 @@ When the number of meaningful buckets is bellow a certain threshold, storing syn
 In the sparse format the synospsis is a list of bucket ID (2 bytes) and bucket value (1 byte), only for buckets where the values is non-zero.
 
 ```
- Byte 0   Byte 1   Byte 2  
+ Byte 0   Byte 1   Byte 2
 +--------+--------+--------+---//
-|   <bucket ID>   | value  | 
+|   <bucket ID>   | value  |
 +--------+--------+--------+---//
 ```
 
@@ -223,9 +217,9 @@ Both HllDistinctCount and HllCreateSynopsis expect two parameters:
   name | possible values | description
   -----|-----------------|------------
   hllLeadingBits | 1...16 | Number of bits used cut off from each hash value used to specify which buckets a number falls into. This parameter is inherent to the HyperLogLog algorithm. In general the higher it is, the more accurate is the HLL's estimate. Importantly, synopsis' size is exponentially proportional to this value.
-  bitsPerBucket | 4,5,6,8 | Number of bits used to put serialize synopsis in HllCreateSynopsis. Synopsis' size is proportional to this value. While bitsPerBucket={6,8} won't impact accuracy, when the value is set to 4 or 5, the accuracy might be effected, although this behaviour is unlikely. 
+  bitsPerBucket | 4,5,6,8 | Number of bits used to put serialize synopsis in HllCreateSynopsis. Synopsis' size is proportional to this value. While bitsPerBucket={6,8} won't impact accuracy, when the value is set to 4 or 5, the accuracy might be effected, although this behaviour is unlikely.
 
-  **It is worthwhile to note that the smaller the synopsis is, the faster the algorithm will be**. For precise numbers please refer to the `Latency and accuracy benchmarks` below. 
+  **It is worthwhile to note that the smaller the synopsis is, the faster the algorithm will be**. For precise numbers please refer to the `Latency and accuracy benchmarks` below.
 
 From the Vertica's point of view a synopsis is just a VARBINARY. Its size depends on the number of precision bits and compactness (number of bits per bucket) and is fixed for these two parameters, i.e. no matter what the stored cardinality is, the synopsis will have constant size. The table below characterizes synopsis size for different values of parameters. In the rows there are different supported compactness values. In the columns there are various precision sizes (i.e. binary logarithm of number of buckets). Please note that the highest supported precision is 16 bits.
 
@@ -256,16 +250,6 @@ CREATE LIBRARY libhll AS '/path/to/libhll.so';
 CREATE AGGREGATE FUNCTION HllCreateSynopsis AS LANGUAGE 'C++' NAME 'HllCreateSynopsisFactory' LIBRARY libhll;
 CREATE AGGREGATE FUNCTION HllDistinctCount AS LANGUAGE 'C++' NAME 'HllDistinctCountFactory' LIBRARY libhll;
 CREATE AGGREGATE FUNCTION HllCombine AS LANGUAGE 'C++' NAME 'HllCombineFactory' LIBRARY libhll;
-```
-
-To use Druid implementation of HyperLogLog we need to register the UDFs in Vertica this way.
-```SQL
-SET ROLE pseudosuperuser;
-DROP LIBRARY libhll CASCADE;
-CREATE LIBRARY libhlldruid AS '/path/to/libhlldruid.so';
-CREATE AGGREGATE FUNCTION HllDruidCreateSynopsis AS LANGUAGE 'C++' NAME 'HllDruidCreateSynopsisFactory' LIBRARY libhlldruid;
-CREATE AGGREGATE FUNCTION HllDruidDistinctCount AS LANGUAGE 'C++' NAME 'HllDruidDistinctCountFactory' LIBRARY libhlldruid;
-CREATE AGGREGATE FUNCTION HllDruidCombine AS LANGUAGE 'C++' NAME 'HllDruidCombineFactory' LIBRARY libhlldruid;
 ```
 
 ### Computing DISTINCT COUNT

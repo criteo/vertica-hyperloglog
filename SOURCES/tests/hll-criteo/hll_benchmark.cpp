@@ -1,25 +1,6 @@
-/*
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-*/
-
 #include <iostream>
 #include <fstream>
-#include "hll.hpp"
+#include "hll-criteo/hll.hpp"
 #include "optionparser.h"
 
 using namespace option;
@@ -62,9 +43,9 @@ int64_t getOutputStep(int64_t realCardinality) {
 
 int main(int argc, char **argv) {
 
-  uint64_t minCardinality = 1;
-  uint64_t maxCardinality = 1000;
-  int repeatCount = 10;
+  size_t minCardinality = 1;
+  size_t maxCardinality = 1000;
+  size_t repeatCount = 10;
   string outputFile = "./hll_benchmark_result.csv";
 
   // Command line parsing code
@@ -113,7 +94,7 @@ int main(int argc, char **argv) {
     cout << "Running for precision " << (int)precision << endl;
     for (size_t iteration = 0; iteration < repeatCount; ++iteration) {
       uint32_t hashSeed = MURMURHASH_DEFAULT_SEED;
-      for (int64_t real_cardinality = 1; real_cardinality <= maxCardinality; ++real_cardinality) {
+      for (size_t real_cardinality = 1; real_cardinality <= maxCardinality; ++real_cardinality) {
         if (iteration > 0) {
           hashSeed = (uint32_t)time(nullptr) + iteration*real_cardinality; // epoch seconds, shifted by iteration number
         }

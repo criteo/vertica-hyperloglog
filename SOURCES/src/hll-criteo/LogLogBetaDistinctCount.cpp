@@ -1,31 +1,12 @@
-/*
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-*/
-
 #include <bitset>
 #include <time.h>
 #include <sstream>
 #include <iostream>
 
-#include "hll.hpp"
-#include "hll_vertica.hpp"
+#include "hll-criteo/hll.hpp"
+#include "hll-criteo/hll_vertica.hpp"
 
-class HllDistinctCount : public AggregateFunction
+class LogLogBetaDistinctCount : public AggregateFunction
 {
 
   vint hllLeadingBits;
@@ -41,7 +22,7 @@ public:
     try
     {
       size_t maxSize = Hll<uint64_t>::getMaxDeserializedBufferSize(hllLeadingBits);
-      aggs.getStringRef(0).alloc(maxSize);
+      aggs.getStringRef(0).alloc(maxSize + sizeof(HLLHdr));
       Hll<uint64_t> hll = Hll<uint64_t>::wrapRawBuffer(
         hllLeadingBits,
         reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
@@ -50,9 +31,8 @@ public:
       hll.reset();
     } catch (std::exception &e)
     {
-      vt_report_error(0, "Exception while initializing intermediate aggregates: [%s]", e.what());
+      vt_report_error(0, "Exception while initializing intermediate aggregates: [%s] [%d]", e.what(), hllLeadingBits);
     }
-
   }
 
   void aggregate(ServerInterface &srvInterface,
@@ -62,7 +42,7 @@ public:
     try {
       Hll<uint64_t> hll = Hll<uint64_t>::wrapRawBuffer(
         hllLeadingBits,
-        reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
+        reinterpret_cast<std::uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
       do {
@@ -74,7 +54,6 @@ public:
     } catch(SerializationError& e) {
       vt_report_error(0, e.what());
     }
-
   }
 
   virtual void combine(ServerInterface &srvInterface,
@@ -84,7 +63,7 @@ public:
     try {
       Hll<uint64_t> hll = Hll<uint64_t>::wrapRawBuffer(
         hllLeadingBits,
-        reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
+        reinterpret_cast<std::uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
       do {
@@ -108,25 +87,24 @@ public:
         reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
-      resWriter.setInt(hll.approximateCountDistinct());
+      resWriter.setInt(hll.approximateCountDistinct_beta());
     } catch(SerializationError& e) {
       vt_report_error(0, e.what());
     }
-
   }
 
   InlineAggregate()
 };
 
 
-class HllDistinctCountFactory : public AggregateFunctionFactory
+class LogLogBetaDistinctCountFactory : public AggregateFunctionFactory
 {
   virtual void getIntermediateTypes(ServerInterface &srvInterface,
                                     const SizedColumnTypes &inputTypes,
                                     SizedColumnTypes &intermediateTypeMetaData)
   {
     uint8_t precision = readSubStreamBits(srvInterface);
-    intermediateTypeMetaData.addVarbinary(Hll<uint64_t>::getMaxDeserializedBufferSize(precision));
+    intermediateTypeMetaData.addVarbinary(Hll<uint64_t>::getMaxDeserializedBufferSize(precision) + sizeof(HLLHdr));
   }
 
 
@@ -147,7 +125,7 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
 
   virtual AggregateFunction *createAggregateFunction(ServerInterface &srvInterface)
   {
-    return vt_createFuncObject<HllDistinctCount>(srvInterface.allocator);
+    return vt_createFuncObject<LogLogBetaDistinctCount>(srvInterface.allocator);
   }
 
   virtual void getParameterType(ServerInterface &srvInterface,
@@ -167,13 +145,13 @@ class HllDistinctCountFactory : public AggregateFunctionFactory
 
 };
 
-RegisterFactory(HllDistinctCountFactory);
+RegisterFactory(LogLogBetaDistinctCountFactory);
 RegisterLibrary("Criteo", // author
                 "", // lib_build_tag
                 "0.6", // lib_version
                 "7.2.1", // lib_sdk_version
-                "https://github.com/criteo/vertica-hyperloglog", // URL
-                "HyperLogLog implementation as User Defined Aggregate Functions", // description
+                "https://arxiv.org/abs/1612.02284", // URL
+                "LogLogBeta implementation as User Defined Aggregate Functions", // description
                 "", // licenses required
                 "" // signature
                 );
