@@ -3,10 +3,11 @@
 #include <sstream>
 #include <iostream>
 
-#include "hll.hpp"
-#include "hll_vertica.hpp"
+#include "hll-criteo/hll.hpp"
+//#include "hll_aggregate_function.hpp"
+#include "hll-criteo/hll_vertica.hpp"
 
-class LogLogBetaDistinctCount : public AggregateFunction
+class HllDistinctCount : public AggregateFunction
 {
 
   vint hllLeadingBits;
@@ -22,7 +23,7 @@ public:
     try
     {
       size_t maxSize = Hll<uint64_t>::getMaxDeserializedBufferSize(hllLeadingBits);
-      aggs.getStringRef(0).alloc(maxSize + sizeof(HLLHdr));
+      aggs.getStringRef(0).alloc(maxSize);
       Hll<uint64_t> hll = Hll<uint64_t>::wrapRawBuffer(
         hllLeadingBits,
         reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
@@ -31,8 +32,9 @@ public:
       hll.reset();
     } catch (std::exception &e)
     {
-      vt_report_error(0, "Exception while initializing intermediate aggregates: [%s] [%d]", e.what(), hllLeadingBits);
+      vt_report_error(0, "Exception while initializing intermediate aggregates: [%s]", e.what());
     }
+
   }
 
   void aggregate(ServerInterface &srvInterface,
@@ -42,7 +44,7 @@ public:
     try {
       Hll<uint64_t> hll = Hll<uint64_t>::wrapRawBuffer(
         hllLeadingBits,
-        reinterpret_cast<std::uint8_t *>(aggs.getStringRef(0).data()),
+        reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
       do {
@@ -54,6 +56,7 @@ public:
     } catch(SerializationError& e) {
       vt_report_error(0, e.what());
     }
+
   }
 
   virtual void combine(ServerInterface &srvInterface,
@@ -63,7 +66,7 @@ public:
     try {
       Hll<uint64_t> hll = Hll<uint64_t>::wrapRawBuffer(
         hllLeadingBits,
-        reinterpret_cast<std::uint8_t *>(aggs.getStringRef(0).data()),
+        reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
       do {
@@ -87,24 +90,25 @@ public:
         reinterpret_cast<uint8_t *>(aggs.getStringRef(0).data()),
         aggs.getTypeMetaData().getColumnType(0).getStringLength()
       );
-      resWriter.setInt(hll.approximateCountDistinct_beta());
+      resWriter.setInt(hll.approximateCountDistinct());
     } catch(SerializationError& e) {
       vt_report_error(0, e.what());
     }
+
   }
 
   InlineAggregate()
 };
 
 
-class LogLogBetaDistinctCountFactory : public AggregateFunctionFactory
+class HllDistinctCountFactory : public AggregateFunctionFactory
 {
   virtual void getIntermediateTypes(ServerInterface &srvInterface,
                                     const SizedColumnTypes &inputTypes,
                                     SizedColumnTypes &intermediateTypeMetaData)
   {
     uint8_t precision = readSubStreamBits(srvInterface);
-    intermediateTypeMetaData.addVarbinary(Hll<uint64_t>::getMaxDeserializedBufferSize(precision) + sizeof(HLLHdr));
+    intermediateTypeMetaData.addVarbinary(Hll<uint64_t>::getMaxDeserializedBufferSize(precision));
   }
 
 
@@ -125,7 +129,7 @@ class LogLogBetaDistinctCountFactory : public AggregateFunctionFactory
 
   virtual AggregateFunction *createAggregateFunction(ServerInterface &srvInterface)
   {
-    return vt_createFuncObject<LogLogBetaDistinctCount>(srvInterface.allocator);
+    return vt_createFuncObject<HllDistinctCount>(srvInterface.allocator);
   }
 
   virtual void getParameterType(ServerInterface &srvInterface,
@@ -145,13 +149,13 @@ class LogLogBetaDistinctCountFactory : public AggregateFunctionFactory
 
 };
 
-RegisterFactory(LogLogBetaDistinctCountFactory);
+RegisterFactory(HllDistinctCountFactory);
 RegisterLibrary("Criteo", // author
                 "", // lib_build_tag
                 "0.6", // lib_version
                 "7.2.1", // lib_sdk_version
-                "https://arxiv.org/abs/1612.02284", // URL
-                "LogLogBeta implementation as User Defined Aggregate Functions", // description
+                "https://github.com/criteo/vertica-hyperloglog", // URL
+                "HyperLogLog implementation as User Defined Aggregate Functions", // description
                 "", // licenses required
                 "" // signature
                 );

@@ -4,7 +4,7 @@
 #include <iterator>
 #include <iostream>
 #include <utility>
-#include "linear_counting.hpp"
+#include "hll-criteo/linear_counting.hpp"
 #include <cmath>
 
 LinearCounting::LinearCounting(uint8_t prec) : precision(prec) {
