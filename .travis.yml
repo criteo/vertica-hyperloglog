@@ -1,0 +1,6 @@
+language: cpp
+compiler:
+    - clang
+    - gcc
+
+script: mkdir build && cd build && cmake -DBUILD_TESTS=ON ../SOURCES && make check
