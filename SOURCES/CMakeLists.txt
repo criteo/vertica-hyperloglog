@@ -56,7 +56,12 @@ if (BUILD_VERTICA_LIB)
   set_target_properties(loglogbeta PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
   # Installation process just copies the binary HLL to Vertica lib folder
-  set(LIB_DIR /opt/vertica/lib)
+  if (INSTALL_PREFIX_PATH)
+    set(LIB_DIR ${INSTALL_PREFIX_PATH}/opt/vertica/lib)
+  else()
+    set(LIB_DIR /opt/vertica/lib)
+  endif()
+
   install(
     TARGETS hll loglogbeta
     DESTINATION ${LIB_DIR}
