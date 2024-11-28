@@ -17,6 +17,22 @@ option(BUILD_DATA_GEN "Build data generator for functional tests in Vertica" OFF
 option(BUILD_TESTS "Build all tests." OFF)
 option(BUILD_BENCHMARK "Build benchmark to run HLL estimations." OFF)
 
+
+## When building for Vertica 11, you need to set specific defines
+file(READ "/opt/vertica/sdk/include/BuildInfo.h" buildinfosdk)
+string(REGEX MATCH "#define[ ]+VERTICA_BUILD_ID_SDK_Version_Major[ ]+([0-9]+)" _ ${buildinfosdk})
+set(ver_major ${CMAKE_MATCH_1})
+message("Version", ${ver_major})
+if (${ver_major} LESS_EQUAL 11)
+  add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+  message("Using CXX11 ABI because Vertica <= 11:", ${ver_major})
+else()
+  message("Not using CXX11 ABI because newer SDK than Vertica 11", ${ver_major})
+endif()
+
+## For Vertica 24, you don't need it.
+
+
 #####################
 ##  COMPILE FLAGS  ##
 #####################
@@ -52,8 +68,8 @@ if (BUILD_VERTICA_LIB)
 
   add_library(hll SHARED ${HLL_SRC} src/hll-criteo/HllCombine.cpp src/hll-criteo/HllDistinctCount.cpp src/hll-criteo/HllCreateSynopsis.cpp)
   add_library(loglogbeta SHARED ${HLL_SRC} src/hll-criteo/LogLogBetaDistinctCount.cpp)
-  set_target_properties(hll PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-  set_target_properties(loglogbeta PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+  set_target_properties(hll PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS}")
+  set_target_properties(loglogbeta PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS}")
 
   # Installation process just copies the binary HLL to Vertica lib folder
   if (INSTALL_PREFIX_PATH)
